@@ -190,22 +190,7 @@ const BCC=[{id:"electricity",l:"Electricity",i:"⚡"},{id:"gas",l:"Gas",i:"🔥"
 const AC=[...DC,...SC,...BCC];
 const fc=id=>AC.find(c=>c.id===id)||{l:id,i:"📦"};
 const catsFor=b=>b==="daily"?DC:b==="splurge"?SC:BCC;
-const INIT=[
-  {id:"i01",amount:129.13,category:"groceries",bucket:"daily",note:"Coles Healesville",who:"liz",created_at:"2026-03-08T11:00:00Z"},
-  {id:"i02",amount:64.20,category:"fuel",bucket:"daily",note:"Reddy Express Lilydale",who:"matt",created_at:"2026-03-06T13:00:00Z"},
-  {id:"i03",amount:27.44,category:"groceries",bucket:"daily",note:"Coles Healesville",who:"matt",created_at:"2026-03-07T11:00:00Z"},
-  {id:"i04",amount:11.99,category:"health",bucket:"daily",note:"Healesville Walk Pharma",who:"matt",created_at:"2026-03-07T10:00:00Z"},
-  {id:"i05",amount:15.94,category:"transport",bucket:"daily",note:"Southern Cross Station",who:"matt",created_at:"2026-03-07T13:00:00Z"},
-  {id:"i06",amount:30.00,category:"groceries",bucket:"daily",note:"Cathedral Valley Honey",who:"matt",created_at:"2026-03-07T12:00:00Z"},
-  {id:"i07",amount:9.00,category:"market",bucket:"splurge",note:"Timbarra Farm Healesville",who:"matt",created_at:"2026-03-06T12:00:00Z"},
-  {id:"i08",amount:268.15,category:"eating_out",bucket:"splurge",note:"Bistro Gitan (our half)",who:"matt",created_at:"2026-03-06T11:00:00Z"},
-  {id:"i09",amount:47.00,category:"eating_out",bucket:"splurge",note:"Gojo Event Mgmt Southbank",who:"matt",created_at:"2026-03-06T14:00:00Z"},
-  {id:"i10",amount:44.00,category:"wine",bucket:"splurge",note:"Plum & Rye Healesville",who:"matt",created_at:"2026-03-07T09:00:00Z"},
-  {id:"i11",amount:12.30,category:"eating_out",bucket:"splurge",note:"JUDE",who:"matt",created_at:"2026-03-08T12:00:00Z"},
-  {id:"i12",amount:20.38,category:"eating_out",bucket:"splurge",note:"PFFNC Port Fairy",who:"matt",created_at:"2026-03-08T10:00:00Z"},
-  {id:"i13",amount:11.59,category:"eating_out",bucket:"splurge",note:"Papa Sushi Melbourne",who:"matt",created_at:"2026-03-08T09:00:00Z"},
-  {id:"i14",amount:12.12,category:"coffee",bucket:"splurge",note:"Beraldo Coffee",who:"matt",created_at:"2026-03-07T14:00:00Z"},
-];
+const INIT=[];
 let tx=[],st={pin:"2026",daily_weekly:605,splurge_weekly:250,bills_monthly:1166,pay_day:4};
 let vw="dash",fB="daily",fC="groceries",fW="matt";
 let sb=null,uL=true;
@@ -229,7 +214,7 @@ async function initSB(){
     const{data:s2}=await sb.from("settings").select("*").eq("id","main").single();
     if(s2){Object.assign(st,s2)}
     const{data:t2}=await sb.from("transactions").select("*").order("created_at",{ascending:false});
-    if(t2&&t2.length){tx=t2}else{for(const t of INIT){await sb.from("transactions").insert(t)}tx=[...INIT]}
+    tx=t2||[];
     uL=false;sdot("on");
     sb.channel("tx-sync").on("postgres_changes",{event:"*",schema:"public",table:"transactions"},()=>{fetchAll()}).subscribe();
     pollTimer=setInterval(fetchAll,15000);
