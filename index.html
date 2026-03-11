@@ -204,7 +204,7 @@ let vw="dash",fB="daily",fC="groceries",fW="matt";
 let sb=null,uL=true;
 let editId=null,editB="daily",editC="groceries",editW="matt";
 let pendingIds=new Set(),busy=false;
-let scanResults=[],scanImg=null;
+let scanResults=[],scanImg=null,scanBusy=false;
 // Pay week helpers
 function pwStart(d,pd){const x=new Date(d);x.setHours(0,0,0,0);let diff=x.getDay()-pd;if(diff<0)diff+=7;x.setDate(x.getDate()-diff);return x}
 function pwEnd(d,pd){const s=pwStart(d,pd),e=new Date(s);e.setDate(s.getDate()+6);e.setHours(23,59,59,999);return e}
@@ -290,6 +290,8 @@ async function resetAll(){if(!confirm("Clear all?"))return;if(!uL&&sb){await sb.
 // ═══════════════════════════════════════
 function renderScan(){
   const el=document.getElementById("v-scan");
+  // Don't re-render if scan is in progress or results are showing
+  if(scanBusy||scanResults.length)return;
   if(!apiKey){
     el.innerHTML=`<div class="cd"><div class="lb">AI SCAN</div><p style="font-size:13px;color:var(--text2);margin:12px 0">To use AI Scan, add your Anthropic API key in Settings (⚙).</p><p style="font-size:11px;color:var(--text3)">The key stays on your device and is only used to read screenshots of your Amex statement.</p><button class="sb" style="margin-top:14px" onclick="openS()">Open Settings</button></div>`;
     return;
@@ -375,26 +377,41 @@ async function confirmScan(){
   const toAdd=scanResults.filter(r=>!r._skip);
   const out=document.getElementById("scan-output");
   out.innerHTML=`<div class="cd" style="text-align:center;padding:30px"><div class="scan-spinner"></div><div style="font-size:13px;color:var(--text2);margin-top:8px">Adding ${toAdd.length} transactions...</div></div>`;
+  
+  // Build all transaction objects first
+  const newTxns=toAdd.map(r=>({
+    id:Date.now().toString()+Math.random().toString(36).slice(2,8),
+    amount:Number(r.amount),
+    category:r.category,
+    bucket:r.bucket,
+    note:r.merchant,
+    who:r.who||"matt",
+    created_at:r.date?new Date(r.date+"T12:00:00").toISOString():new Date().toISOString()
+  }));
+  
+  // Add all locally at once
+  newTxns.forEach(t=>{pendingIds.add(t.id);tx.unshift(t)});
+  saveL();
+  
+  // Batch insert to Supabase
   busy=true;
-  for(const r of toAdd){
-    const t={
-      id:Date.now().toString()+Math.random().toString(36).slice(2,6),
-      amount:Number(r.amount),
-      category:r.category,
-      bucket:r.bucket,
-      note:r.merchant,
-      who:r.who||"matt",
-      created_at:r.date?new Date(r.date+"T12:00:00").toISOString():new Date().toISOString()
-    };
-    pendingIds.add(t.id);
-    tx.unshift(t);
-    if(!uL&&sb){try{await sb.from("transactions").insert(t);pendingIds.delete(t.id)}catch(e){}}
+  if(!uL&&sb){
+    try{
+      await sb.from("transactions").insert(newTxns);
+      newTxns.forEach(t=>pendingIds.delete(t.id));
+    }catch(e){console.error("Batch insert failed:",e)}
   }
   busy=false;
-  saveL();
+  
+  // Clear scan state
   scanResults=[];
-  out.innerHTML=`<div class="cd" style="text-align:center;padding:30px"><div style="font-size:32px;margin-bottom:8px">✅</div><div style="font-size:14px;color:var(--sage-deep);font-weight:600">${toAdd.length} transactions added!</div><button class="sb" style="margin-top:14px" onclick="go('dash')">View Dashboard</button></div>`;
+  scanBusy=false;
+  saveL();
+  
+  const count=toAdd.length;
+  out.innerHTML=`<div class="cd" style="text-align:center;padding:30px"><div style="font-size:32px;margin-bottom:8px">✅</div><div style="font-size:14px;color:var(--sage-deep);font-weight:600">${count} transactions added!</div><button class="sb" style="margin-top:14px" onclick="scanResults=[];scanBusy=false;go('dash')">View Dashboard</button></div>`;
 }
+
 // ═══════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════
