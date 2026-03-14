@@ -341,7 +341,7 @@ async function doScan(){
 For each transaction return a JSON array of objects with these fields:
 - "merchant": the merchant name as shown
 - "amount": the dollar amount as a number (no $ sign)
-- "date": the date in YYYY-MM-DD format (use 2026 as the year if not shown)
+- "date": the date in YYYY-MM-DD format. If the date is not visible for a transaction, use today's date: ${new Date().toISOString().split("T")[0]}
 - "bucket": one of "daily", "splurge", or "bill"
 - "category": one of these IDs: ${catList}
 - "who": default to "matt"
@@ -415,13 +415,12 @@ async function confirmScan(){
     // Robust date parsing - try multiple formats, fall back to now
     let dt=new Date();
     if(r.date){
-      // Try YYYY-MM-DD format first
       const d=new Date(r.date+"T12:00:00");
-      if(!isNaN(d.getTime()))dt=d;
-      else{
-        // Try DD/MM/YYYY or other formats
-        const parts=r.date.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/);
-        if(parts){const d2=new Date(parts[3].length===2?"20"+parts[3]:parts[3],parts[2]-1,parts[1]);if(!isNaN(d2.getTime()))dt=d2}
+      if(!isNaN(d.getTime())){
+        // Sanity check: reject dates more than 60 days from today
+        const diffDays=Math.abs((dt-d)/(1000*60*60*24));
+        if(diffDays<60)dt=d;
+        // else: date is too far off (like Jan 1), use today instead
       }
     }
     return {
@@ -496,7 +495,7 @@ function render(){
   const amxTotal=mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0);
   const dbtTotal=mt.filter(t=>t.card==="debit").reduce((s,t)=>s+t.amount,0);
 
-  document.getElementById("ap").textContent=Math.floor(tx.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0)*1.25).toLocaleString();
+  document.getElementById("ap").textContent=Math.floor(mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0)*1.25).toLocaleString();
   const wr=pwRange(pd);
 
   let h="";
