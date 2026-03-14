@@ -356,7 +356,16 @@ CATEGORISATION RULES:
 Here is how the user has previously categorised similar merchants:
 ${merchantHistory}
 
-IMPORTANT: Return ONLY a JSON array, no markdown, no backticks, no explanation. Skip pending transactions and non-purchase entries like "Plan It".`;
+IMPORTANT: Return ONLY a JSON array, no markdown, no backticks, no explanation. Skip ALL of the following - do NOT include them:
+- Pending transactions
+- Non-purchase entries like "Plan It" labels
+- Transfers between accounts (e.g. "Transfer to", "Transfer from", "Internal transfer", "Bill payment to own account", money moved to savings/mortgage/bills accounts)
+- Direct debits for loan repayments, mortgage payments, or car finance
+- Centrelink payments
+- Salary or wage deposits
+- Any transaction that is money moving between the user's own accounts rather than a purchase from a merchant
+
+Only include actual purchases from merchants, shops, restaurants, service providers, and billers.`;
 
   try{
     const resp=await fetch("https://api.anthropic.com/v1/messages",{
