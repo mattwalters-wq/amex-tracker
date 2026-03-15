@@ -520,13 +520,19 @@ function closeDrill(){document.getElementById("dm").classList.add("hid");drillBu
 // ═══ RENDER ═══
 function render(){
   const now=new Date(),cm=mk(now),pd=st.pay_day,dl2=dleft(pd);
-  document.getElementById("hs").textContent=`Daily $${st.daily_weekly}/wk · Splurge $${st.splurge_weekly}/wk · Pay: ${DAYS[pd]}`;
+  document.getElementById("hs").textContent=`Daily ${adjDailyCap}/wk · Splurge ${adjSplurgeCap}/wk · Pay: ${DAYS[pd]}`;
   const mt=tx.filter(t=>mk(t.created_at)===cm);
   // Budget tracks ALL spend (amex + debit)
-  const wd=mt.filter(t=>t.bucket==="daily"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
-  const ws=mt.filter(t=>t.bucket==="splurge"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
   const lwd=mt.filter(t=>t.bucket==="daily"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
   const lws=mt.filter(t=>t.bucket==="splurge"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
+  // Calculate overspend carry-forward: if last week was over, reduce this week's cap
+  const dailyOverspend=Math.max(0,lwd-st.daily_weekly);
+  const splurgeOverspend=Math.max(0,lws-st.splurge_weekly);
+  const adjDailyCap=Math.max(0,st.daily_weekly-dailyOverspend);
+  const adjSplurgeCap=Math.max(0,st.splurge_weekly-splurgeOverspend);
+  // Current week spend
+  const wd=mt.filter(t=>t.bucket==="daily"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
+  const ws=mt.filter(t=>t.bucket==="splurge"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
   const mbt=mt.filter(t=>t.bucket==="bill").reduce((s,t)=>s+t.amount,0);
   const mdt=mt.filter(t=>t.bucket==="daily").reduce((s,t)=>s+t.amount,0);
   const mst=mt.filter(t=>t.bucket==="splurge").reduce((s,t)=>s+t.amount,0);
@@ -540,8 +546,8 @@ function render(){
   const wr=pwRange(pd);
 
   let h="";
-  h+=bcard("DAILY - THIS WEEK",wr,wd,st.daily_weekly,dl2,lwd,"openDrill('daily',true)");
-  h+=bcard("SPLURGE - THIS WEEK",wr,ws,st.splurge_weekly,dl2,lws,"openDrill('splurge',true)");
+  h+=bcard("DAILY - THIS WEEK",wr,wd,adjDailyCap,dl2,lwd,st.daily_weekly,"openDrill('daily',true)",dailyOverspend);
+  h+=bcard("SPLURGE - THIS WEEK",wr,ws,adjSplurgeCap,dl2,lws,st.splurge_weekly,"openDrill('splurge',true)",splurgeOverspend);
   const bmp=Math.min(100,mbt/st.bills_monthly*100),bmr=Math.max(0,st.bills_monthly-mbt),bc2=bcol(bmp);
   h+=`<div class="cd cdp" style="border-left-color:${bc2};cursor:pointer" onclick="openDrill('bill',false)"><div class="ch"><div><div class="lb">BILLS - THIS MONTH</div><div class="dr">${now.toLocaleString("default",{month:"long",year:"numeric"})}</div></div><div class="ca"><span style="color:${bc2}">$${mbt.toFixed(0)}</span><span class="cc"> / $${st.bills_monthly}</span></div></div><div class="tk"><div class="br" style="width:${bmp}%;background:${bc2}"></div></div><div class="rr"><span class="ok">$${bmr.toFixed(0)} remaining</span></div></div>`;
 
@@ -585,15 +591,16 @@ function render(){
   document.getElementById("v-hist").innerHTML=hi;
 }
 
-function bcard(title,range,spent,cap,dl2,lastWk,onclick){
+function bcard(title,range,spent,cap,dl2,lastWk,baseCap,onclick,overspend){
   const pct=Math.min(100,spent/cap*100),rem=Math.max(0,cap-spent),c=bcol(pct);
   let h=`<div class="cd cdp" style="border-left-color:${c}${onclick?";cursor:pointer":""}" ${onclick?`onclick="${onclick}"`:""}><div class="ch"><div><div class="lb">${title}</div><div class="dr">${range}</div></div><div class="ca"><span style="color:${c}">$${spent.toFixed(0)}</span><span class="cc"> / $${cap}</span></div></div><div class="tk"><div class="br" style="width:${pct}%;background:${c}"></div></div><div class="rr">`;
+  if(overspend>0)h+=`<div style="font-size:10px;color:var(--over);margin-bottom:8px;font-weight:600">⚠️ Adjusted: -${overspend.toFixed(0)} carried from last week (was ${baseCap})</div>`;
   if(pct>=100)h+=`<span class="ov">⚠️ Over by $${(spent-cap).toFixed(0)} - use debit!</span>`;
   else if(pct>=80)h+=`<span class="wn">⚡ $${rem.toFixed(0)} left - slow down</span>`;
   else h+=`<span class="ok">$${rem.toFixed(0)} remaining</span>`;
   if(pct<100)h+=`<span class="pd2">~$${(rem/dl2).toFixed(0)}/day</span>`;
   h+=`</div>`;
-  if(lastWk>0)h+=`<div class="fn-row">Last week: $${lastWk.toFixed(0)} ${lastWk>cap?`<span style="color:var(--over)">(over $${(lastWk-cap).toFixed(0)})</span>`:`<span style="color:var(--sage-deep)">($${(cap-lastWk).toFixed(0)} under)</span>`}</div>`;
+  if(lastWk>0)h+=`<div class="fn-row">Last week: ${lastWk.toFixed(0)} ${lastWk>(baseCap||cap)?`<span style="color:var(--over)">(over ${(lastWk-(baseCap||cap)).toFixed(0)})</span>`:`<span style="color:var(--sage-deep)">(${((baseCap||cap)-lastWk).toFixed(0)} under)</span>`}</div>`;
   h+=`</div>`;return h;
 }
 
