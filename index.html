@@ -573,18 +573,18 @@ function render(){
   const onTrack=mPct<=pacePct+5;
   const mc=mPct>pacePct+10?"var(--over)":mPct>pacePct?"var(--ochre)":"var(--sage-deep)";
   let h="";
-  h+='<div class="cd" style="border-left:5px solid \'+mc+\'"><div class="lb">MONTHLY LIVING SPEND</div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px"><div style="font-family:\'Instrument Serif\',serif;font-size:28px;color:\'+mc+\'">$\'+livingSpend+\'</div><div style="font-size:13px;color:var(--text3)">of $\'+monthlyLivingCap+\'</div></div>';
-  h+='<div style="position:relative"><div class="tk"><div class="br" style="width:\'+mPct+\'%;background:\'+mc+\'"></div></div><div style="position:absolute;top:-2px;left:\'+pacePct+\'%;width:2px;height:11px;background:var(--text3);border-radius:1px"></div></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px"><span>\'+mPct+\'% spent</span><span>|</span><span>pace: \'+pacePct+\'%</span></div>';
+  h+='<div class="cd" style="border-left:5px solid '+mc+'"><div class="lb">MONTHLY LIVING SPEND</div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px"><div style="font-family:\'Instrument Serif\',serif;font-size:28px;color:'+mc+'">$'+livingSpend+'</div><div style="font-size:13px;color:var(--text3)">of $'+monthlyLivingCap+'</div></div>';
+  h+='<div style="position:relative"><div class="tk"><div class="br" style="width:'+mPct+'%;background:'+mc+'"></div></div><div style="position:absolute;top:-2px;left:'+pacePct+'%;width:2px;height:11px;background:var(--text3);border-radius:1px"></div></div>';
+  h+='<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px"><span>'+mPct+'% spent</span><span>|</span><span>pace: '+pacePct+'%</span></div>';
   if(livingSpend>monthlyLivingCap){
-    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--over-bg);border-radius:10px;font-size:12px;color:var(--over)">Over budget by $\'+(livingSpend-monthlyLivingCap)+\'. Switch to debit for remaining spend.</div>';
+    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--over-bg);border-radius:10px;font-size:12px;color:var(--over)">Over budget by $'+(livingSpend-monthlyLivingCap)+'. Switch to debit for remaining spend.</div>';
   }else if(onTrack){
-    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--sage-bg);border-radius:10px;font-size:12px;color:var(--sage-deep)">On track. <b>$\'+dailyBudgetRest+\'/day</b> for the rest of the month.</div>';
+    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--sage-bg);border-radius:10px;font-size:12px;color:var(--sage-deep)">On track. <b>$'+dailyBudgetRest+'/day</b> for the rest of the month.</div>';
   }else{
-    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--ochre-bg);border-radius:10px;font-size:12px;color:var(--ochre)">Ahead of pace. Aim for <b>$\'+dailyBudgetRest+\'/day</b> to stay on budget.</div>';
+    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--ochre-bg);border-radius:10px;font-size:12px;color:var(--ochre)">Ahead of pace. Aim for <b>$'+dailyBudgetRest+'/day</b> to stay on budget.</div>';
   }
-  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Daily $\'+mdt+\' + Splurge $\'+mst+\' · \'+daysLeft+\' days left</div></div>';
+  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Daily $'+mdt+' + Splurge $'+mst+' · '+daysLeft+' days left</div></div>';
   h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
   h+=weekCard("Daily",wd,adjDaily,dl2,dailyOver,"openDrill('daily',true)");
   h+=weekCard("Splurge",ws,adjSplurge,dl2,splurgeOver,"openDrill('splurge',true)");
@@ -592,19 +592,19 @@ function render(){
   if(wd>adjDaily||ws>adjSplurge){
     const totalWeekOver=Math.max(0,wd-adjDaily)+Math.max(0,ws-adjSplurge);
     h+='<div class="cd" style="background:var(--over-bg);border-color:var(--terra-border)"><div class="lb" style="color:var(--over)">GETTING BACK ON TRACK</div>';
-    h+='<div style="font-size:12px;color:var(--text);margin-top:6px">Over by <b>$\'+totalWeekOver+\'</b> this week. To recover:</div>';
+    h+='<div style="font-size:12px;color:var(--text);margin-top:6px">Over by <b>$'+totalWeekOver+'</b> this week. To recover:</div>';
     h+='<div style="display:flex;gap:10px;margin-top:10px">';
-    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$\'+dailyBudgetRest+\'</div><div style="font-size:9px;color:var(--text3)">per day rest of month</div></div>';
-    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$\'+weeklyBudgetRest+\'</div><div style="font-size:9px;color:var(--text3)">per week rest of month</div></div>';
+    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$'+dailyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per day rest of month</div></div>';
+    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$'+weeklyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per week rest of month</div></div>';
     h+='</div></div>';
   }
   const bmp=Math.min(100,mbt/st.bills_monthly*100),bmr=Math.max(0,st.bills_monthly-mbt),bc2=bcol(bmp);
-  h+='<div class="cd cdp" style="border-left-color:\'+bc2+\';cursor:pointer" onclick="openDrill(\'bill\',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">BILLS</div><div style="font-size:10px;color:var(--text3)">$\'+Math.round(bmr)+\' remaining</div></div><div style="font-size:18px;font-weight:700;color:\'+bc2+\'">$\'+mbt+\'<span style="font-size:11px;color:var(--text3);font-weight:400"> / $\'+st.bills_monthly+\'</span></div></div></div>';
+  h+='<div class="cd cdp" style="border-left-color:'+bc2+';cursor:pointer" onclick="openDrill(\'bill\',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">BILLS</div><div style="font-size:10px;color:var(--text3)">$'+Math.round(bmr)+' remaining</div></div><div style="font-size:18px;font-weight:700;color:'+bc2+'">$'+mbt+'<span style="font-size:11px;color:var(--text3);font-weight:400"> / $'+st.bills_monthly+'</span></div></div></div>';
   if(msv>0){
-    h+='<div class="cd" style="cursor:pointer;border-left:5px solid var(--ochre)" onclick="openDrill(\'savings\',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">SAVINGS PURCHASES</div><div style="font-size:10px;color:var(--text3)">Not in weekly budgets</div></div><div style="font-size:18px;font-weight:700;color:var(--ochre)">$\'+msv+\'</div></div></div>';
+    h+='<div class="cd" style="cursor:pointer;border-left:5px solid var(--ochre)" onclick="openDrill(\'savings\',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">SAVINGS PURCHASES</div><div style="font-size:10px;color:var(--text3)">Not in weekly budgets</div></div><div style="font-size:18px;font-weight:700;color:var(--ochre)">$'+msv+'</div></div></div>';
   }
   const amxPts=Math.floor(amxTotal*1.25);
-  h+='<div class="cd tcd"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">AMEX THIS MONTH</div><div style="font-size:11px;color:var(--text2);margin-top:2px">💳 $\'+amxTotal+\' · 🏦 $\'+dbtTotal+\'</div></div><div style="text-align:right"><div class="tp">✈️ \'+amxPts.toLocaleString()+\'</div><div style="font-size:9px;color:var(--text3)">QF points</div></div></div>';
+  h+='<div class="cd tcd"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">AMEX THIS MONTH</div><div style="font-size:11px;color:var(--text2);margin-top:2px">💳 $'+amxTotal+' · 🏦 $'+dbtTotal+'</div></div><div style="text-align:right"><div class="tp">✈️ '+amxPts.toLocaleString()+'</div><div style="font-size:9px;color:var(--text3)">QF points</div></div></div>';
   const bp=Math.min(100,amxTotal/5000*100);
   if(bp<100)h+='<div class="tb2">Bonus: $'+amxTotal+' / $5,000 ('+Math.round(bp)+'%)<div class="tbb"><div class="tbf" style="width:'+bp+'%"></div></div></div>';
   h+='</div>';
@@ -613,14 +613,14 @@ function render(){
   ["add","bills"].forEach(v2=>{
     const cats=fB==="daily"?DC:fB==="splurge"?SC:BCC;
     let f='<div class="cd"><div class="lb">'+(fB==="bill"?"LOG A BILL":fB==="splurge"?"LOG SPLURGE":fB==="savings"?"LOG SAVINGS PURCHASE":"LOG DAILY SPEND")+'</div>';
-    f+='<div class="tgr"><button class="tg\'+(fB==="daily"?" on":"")+\'" onclick="fB=\'daily\';fC=\'groceries\';render()">Daily</button><button class="tg\'+(fB==="splurge"?" on":"")+\'" onclick="fB=\'splurge\';fC=\'eating_out\';render()">Splurge</button><button class="tg\'+(fB==="bill"?" on":"")+\'" onclick="fB=\'bill\';fC=\'electricity\';render()">Bill</button><button class="tg\'+(fB==="savings"?" on":"")+\'" onclick="fB=\'savings\';fC=\'one_off\';render()">Savings</button></div>';
+    f+='<div class="tgr"><button class="tg'+(fB==="daily"?" on":"")+'" onclick="fB=\'daily\';fC=\'groceries\';render()">Daily</button><button class="tg'+(fB==="splurge"?" on":"")+'" onclick="fB=\'splurge\';fC=\'eating_out\';render()">Splurge</button><button class="tg'+(fB==="bill"?" on":"")+'" onclick="fB=\'bill\';fC=\'electricity\';render()">Bill</button><button class="tg'+(fB==="savings"?" on":"")+'" onclick="fB=\'savings\';fC=\'one_off\';render()">Savings</button></div>';
     f+='<div class="aw"><span class="dl">$</span><input type="number" id="fa" class="ai2" placeholder="0.00"></div>';
-    f+='<div class="fl">Card</div><div class="tgr"><button class="tg\'+(fCard==="amex"?" on-amx":"")+\'" onclick="fCard=\'amex\';render()">💳 Amex</button><button class="tg\'+(fCard==="debit"?" on-dbt":"")+\'" onclick="fCard=\'debit\';render()">🏦 Debit</button></div>';
-    f+='<div class="fl">Who?</div><div class="tgr"><button class="tg\'+(fW==="matt"?" on":"")+\'" onclick="fW=\'matt\';render()">Matt</button><button class="tg\'+(fW==="liz"?" on":"")+\'" onclick="fW=\'liz\';render()">Liz</button></div>';
+    f+='<div class="fl">Card</div><div class="tgr"><button class="tg'+(fCard==="amex"?" on-amx":"")+'" onclick="fCard=\'amex\';render()">💳 Amex</button><button class="tg'+(fCard==="debit"?" on-dbt":"")+'" onclick="fCard=\'debit\';render()">🏦 Debit</button></div>';
+    f+='<div class="fl">Who?</div><div class="tgr"><button class="tg'+(fW==="matt"?" on":"")+'" onclick="fW=\'matt\';render()">Matt</button><button class="tg'+(fW==="liz"?" on":"")+'" onclick="fW=\'liz\';render()">Liz</button></div>';
     f+='<div class="fl">Category</div><div class="cg">';
     cats.forEach(c=>{f+='<button class="cbb'+(fC===c.id?" on":"")+'" onclick="fC=''+c.id+'';render()"><span class="cbi">'+c.i+'</span><span class="cbl">'+c.l+'</span></button>'});
-    f+='</div><div class="fl">Note</div><input type="text" id="fn" class="tin" placeholder="\'+(fB==="bill"?"e.g. Q3 electricity":"e.g. Aldi weekly shop")+\'">';
-    f+='<button class="sb" id="fs" onclick="addTxn()">\'+(fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":fB==="savings"?"Add Savings":"Add Daily")+\'</button></div>';
+    f+='</div><div class="fl">Note</div><input type="text" id="fn" class="tin" placeholder="'+(fB==="bill"?"e.g. Q3 electricity":"e.g. Aldi weekly shop")+'">';
+    f+='<button class="sb" id="fs" onclick="addTxn()">'+(fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":fB==="savings"?"Add Savings":"Add Daily")+'</button></div>';
     document.getElementById("v-"+v2).innerHTML=f;
   });
   renderScan();
