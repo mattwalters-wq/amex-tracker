@@ -191,6 +191,14 @@ input[type="number"]{-moz-appearance:textfield}
   <button class="del-btn" onclick="delFromEdit()">Delete Transaction</button>
 </div></div>
 
+<div id="dm" class="mo hid" onclick="closeDrill()"><div class="ml" onclick="event.stopPropagation()" style="max-width:420px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+    <h2 id="dm-title" style="margin:0"></h2>
+    <button onclick="closeDrill()" style="background:none;border:none;font-size:20px;color:var(--text3);cursor:pointer">✕</button>
+  </div>
+  <div id="dm-list"></div>
+</div></div>
+
 <script>
 const SUPABASE_URL="https://cvuznuccqquqqramcqzn.supabase.co";
 const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2dXpudWNjcXF1cXFyYW1jcXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMzU5MDUsImV4cCI6MjA4ODYxMTkwNX0._wwzBR4lGUdRLa7AcxHsf3BBy6KQU3CZTbzN4CT3sOM";
@@ -214,6 +222,7 @@ let sb=null,uL=true;
 let editId=null,editB="daily",editC="groceries",editW="matt",editCard="amex";
 let pendingIds=new Set(),busy=false;
 let scanResults=[],scanBusy=false;
+let drillBucket=null; // "daily","splurge","bill" or null
 
 function pwStart(d,pd){const x=new Date(d);x.setHours(0,0,0,0);let diff=x.getDay()-pd;if(diff<0)diff+=7;x.setDate(x.getDate()-diff);return x}
 function pwEnd(d,pd){const s=pwStart(d,pd),e=new Date(s);e.setDate(s.getDate()+6);e.setHours(23,59,59,999);return e}
@@ -485,6 +494,29 @@ async function confirmScan(){
   render();
 }
 
+// ═══ DRILL DOWN ═══
+function openDrill(bucket,weekOnly){
+  drillBucket=bucket;
+  const cm=mk(new Date()),pd=st.pay_day;
+  const mt=tx.filter(t=>mk(t.created_at)===cm&&t.bucket===bucket);
+  const items=weekOnly?mt.filter(t=>inCW(t.created_at,pd)):mt;
+  const title=bucket==="daily"?"Daily"+(weekOnly?" - This Week":" - Month"):bucket==="splurge"?"Splurge"+(weekOnly?" - This Week":" - Month"):"Bills - This Month";
+  document.getElementById("dm-title").textContent=title;
+  let h="";
+  if(!items.length){h=`<div class="empty">No transactions.<small>Nothing in this bucket yet.</small></div>`}
+  else{
+    const total=items.reduce((s,t)=>s+t.amount,0);
+    h+=`<div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600">Total: ${total.toFixed(2)} · ${items.length} transactions</div>`;
+    items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).forEach(t=>{
+      const c=fc(t.category),d=new Date(t.created_at),isDebit=t.card==="debit";
+      h+=`<div class="tr" style="margin-bottom:6px" onclick="event.stopPropagation();closeDrill();openEdit('${t.id}')"><div class="trl"><span style="font-size:16px">${c.i}</span><div><div class="trc">${c.l}<span class="trw"> - ${t.who==="matt"?"Matt":"Liz"}</span>${isDebit?'<span class="tag tag-dbt">DEBIT</span>':""}</div>${t.note?'<div class="trn">'+t.note+'</div>':""}<div class="trd">${d.toLocaleDateString("en-AU",{day:"numeric",month:"short",weekday:"short"})}</div></div></div><div class="trr"><div class="tra">${t.amount.toFixed(2)}</div><span style="color:var(--text3);font-size:16px">›</span></div></div>`;
+    });
+  }
+  document.getElementById("dm-list").innerHTML=h;
+  document.getElementById("dm").classList.remove("hid");
+}
+function closeDrill(){document.getElementById("dm").classList.add("hid");drillBucket=null}
+
 // ═══ RENDER ═══
 function render(){
   const now=new Date(),cm=mk(now),pd=st.pay_day,dl2=dleft(pd);
@@ -508,10 +540,10 @@ function render(){
   const wr=pwRange(pd);
 
   let h="";
-  h+=bcard("DAILY - THIS WEEK",wr,wd,st.daily_weekly,dl2,lwd);
-  h+=bcard("SPLURGE - THIS WEEK",wr,ws,st.splurge_weekly,dl2,lws);
+  h+=bcard("DAILY - THIS WEEK",wr,wd,st.daily_weekly,dl2,lwd,"openDrill('daily',true)");
+  h+=bcard("SPLURGE - THIS WEEK",wr,ws,st.splurge_weekly,dl2,lws,"openDrill('splurge',true)");
   const bmp=Math.min(100,mbt/st.bills_monthly*100),bmr=Math.max(0,st.bills_monthly-mbt),bc2=bcol(bmp);
-  h+=`<div class="cd cdp" style="border-left-color:${bc2}"><div class="ch"><div><div class="lb">BILLS - THIS MONTH</div><div class="dr">${now.toLocaleString("default",{month:"long",year:"numeric"})}</div></div><div class="ca"><span style="color:${bc2}">$${mbt.toFixed(0)}</span><span class="cc"> / $${st.bills_monthly}</span></div></div><div class="tk"><div class="br" style="width:${bmp}%;background:${bc2}"></div></div><div class="rr"><span class="ok">$${bmr.toFixed(0)} remaining</span></div></div>`;
+  h+=`<div class="cd cdp" style="border-left-color:${bc2};cursor:pointer" onclick="openDrill('bill',false)"><div class="ch"><div><div class="lb">BILLS - THIS MONTH</div><div class="dr">${now.toLocaleString("default",{month:"long",year:"numeric"})}</div></div><div class="ca"><span style="color:${bc2}">$${mbt.toFixed(0)}</span><span class="cc"> / $${st.bills_monthly}</span></div></div><div class="tk"><div class="br" style="width:${bmp}%;background:${bc2}"></div></div><div class="rr"><span class="ok">$${bmr.toFixed(0)} remaining</span></div></div>`;
 
   // Total card with Amex vs Debit split
   const amxPts=Math.floor(amxTotal*1.25);
@@ -553,9 +585,9 @@ function render(){
   document.getElementById("v-hist").innerHTML=hi;
 }
 
-function bcard(title,range,spent,cap,dl2,lastWk){
+function bcard(title,range,spent,cap,dl2,lastWk,onclick){
   const pct=Math.min(100,spent/cap*100),rem=Math.max(0,cap-spent),c=bcol(pct);
-  let h=`<div class="cd cdp" style="border-left-color:${c}"><div class="ch"><div><div class="lb">${title}</div><div class="dr">${range}</div></div><div class="ca"><span style="color:${c}">$${spent.toFixed(0)}</span><span class="cc"> / $${cap}</span></div></div><div class="tk"><div class="br" style="width:${pct}%;background:${c}"></div></div><div class="rr">`;
+  let h=`<div class="cd cdp" style="border-left-color:${c}${onclick?";cursor:pointer":""}" ${onclick?`onclick="${onclick}"`:""}><div class="ch"><div><div class="lb">${title}</div><div class="dr">${range}</div></div><div class="ca"><span style="color:${c}">$${spent.toFixed(0)}</span><span class="cc"> / $${cap}</span></div></div><div class="tk"><div class="br" style="width:${pct}%;background:${c}"></div></div><div class="rr">`;
   if(pct>=100)h+=`<span class="ov">⚠️ Over by $${(spent-cap).toFixed(0)} - use debit!</span>`;
   else if(pct>=80)h+=`<span class="wn">⚡ $${rem.toFixed(0)} left - slow down</span>`;
   else h+=`<span class="ok">$${rem.toFixed(0)} remaining</span>`;
