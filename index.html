@@ -105,6 +105,7 @@ input[type="number"]{-moz-appearance:textfield}
 .tag-s{background:var(--ochre-bg);color:var(--ochre)}
 .tag-b{background:var(--terra-bg);color:var(--terra)}
 .tag-dbt{background:#f0ebe0;color:#8a7a5a}
+.tag-sv{background:var(--olive-bg);color:var(--olive)}
 .trn{font-size:10px;color:var(--text3);margin-top:2px}
 .trd{font-size:9px;color:var(--text3);margin-top:2px}
 .trr{display:flex;align-items:center;gap:8px}
@@ -207,9 +208,10 @@ const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const DC=[{id:"groceries",l:"Groceries",i:"🛒"},{id:"fuel",l:"Fuel",i:"⛽"},{id:"health",l:"Health",i:"💊"},{id:"kids",l:"Kids",i:"👧"},{id:"pets",l:"Pets",i:"🐾"},{id:"transport",l:"Transport",i:"🚗"},{id:"shopping",l:"Shopping",i:"🛍"},{id:"other_daily",l:"Other",i:"📦"}];
 const SC=[{id:"eating_out",l:"Eating Out",i:"🍽"},{id:"coffee",l:"Coffee",i:"☕"},{id:"wine",l:"Wine & Drinks",i:"🍷"},{id:"kb",l:"K&B",i:"🧁"},{id:"market",l:"Market",i:"🥬"},{id:"other_splurge",l:"Other",i:"🎉"}];
 const BCC=[{id:"electricity",l:"Electricity",i:"⚡"},{id:"gas",l:"Gas",i:"🔥"},{id:"water",l:"Water",i:"💧"},{id:"insurance_car",l:"Car Ins",i:"🚙"},{id:"insurance_home",l:"Home Ins",i:"🏠"},{id:"racv_club",l:"RACV Club",i:"🏛"},{id:"council",l:"Council",i:"📋"},{id:"rego",l:"Rego",i:"🚘"},{id:"internet",l:"Internet",i:"📡"},{id:"phone",l:"Phone",i:"📱"},{id:"garden",l:"Garden",i:"🌿"},{id:"piano",l:"Piano",i:"🎹"},{id:"pilates",l:"Pilates",i:"🧘"},{id:"horse",l:"Horse Riding",i:"🐴"},{id:"swimming",l:"Swimming",i:"🏊"},{id:"other_bill",l:"Other",i:"📄"}];
-const AC=[...DC,...SC,...BCC];
+const SVC=[{id:"one_off",l:"One-off",i:"💰"},{id:"home",l:"Home",i:"🏠"},{id:"gift",l:"Gift",i:"🎁"},{id:"other_savings",l:"Other",i:"📦"}];
+const AC=[...DC,...SC,...BCC,...SVC];
 const fc=id=>AC.find(c=>c.id===id)||{l:id,i:"📦"};
-const catsFor=b=>b==="daily"?DC:b==="splurge"?SC:BCC;
+const catsFor=b=>b==="daily"?DC:b==="splurge"?SC:b==="savings"?SVC:BCC;
 
 // Unique ID generator
 let idCounter=0;
@@ -289,7 +291,7 @@ function openEdit(id){const t=tx.find(x=>x.id===id);if(!t)return;editId=id;editB
 function closeEdit(){document.getElementById("em").classList.add("hid");editId=null}
 function renderEM(){
   document.getElementById("ecard-row").innerHTML=["amex","debit"].map(c=>`<button class="tg${editCard===c?(c==="amex"?" on-amx":" on-dbt"):""}" onclick="editCard='${c}';renderEM()">${c==="amex"?"💳 Amex":"🏦 Debit"}</button>`).join("");
-  document.getElementById("eb-row").innerHTML=["daily","splurge","bill"].map(b=>`<button class="tg${editB===b?" on":""}" onclick="editB='${b}';editC=catsFor('${b}')[0].id;renderEM()">${b==="daily"?"Daily":b==="splurge"?"Splurge":"Bill"}</button>`).join("");
+  document.getElementById("eb-row").innerHTML=["daily","splurge","bill","savings"].map(b=>`<button class="tg${editB===b?" on":""}" onclick="editB='${b}';editC=catsFor('${b}')[0].id;renderEM()">${b==="daily"?"Daily":b==="splurge"?"Splurge":b==="savings"?"Savings":"Bill"}</button>`).join("");
   document.getElementById("ec-grid").innerHTML=catsFor(editB).map(c=>`<button class="cbb${editC===c.id?" on":""}" onclick="editC='${c.id}';renderEM()"><span class="cbi">${c.i}</span><span class="cbl">${c.l}</span></button>`).join("");
   document.getElementById("ew-row").innerHTML=["matt","liz"].map(w=>`<button class="tg${editW===w?" on":""}" onclick="editW='${w}';renderEM()">${w==="matt"?"Matt":"Liz"}</button>`).join("");
 }
@@ -301,7 +303,7 @@ async function addTxn(){
   const t={id:uid(),amount:a,category:fC,bucket:fB,note:ne.value,who:fW,card:fCard,created_at:new Date().toISOString()};
   pendingIds.add(t.id);tx.unshift(t);saveL();render();
   ae.value="";ne.value="";
-  const b=document.getElementById("fs");b.textContent="✓ Added!";setTimeout(()=>{b.textContent=fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":"Add Daily"},1200);
+  const b=document.getElementById("fs");b.textContent="✓ Added!";setTimeout(()=>{b.textContent=fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":fB==="savings"?"Add Savings":"Add Daily"},1200);
   if(!uL&&sb){busy=true;try{await sb.from("transactions").insert(t);pendingIds.delete(t.id)}catch(e){console.error("Insert failed:",e)}busy=false}
 }
 async function resetAll(){if(!confirm("Clear all?"))return;if(!uL&&sb){await sb.from("transactions").delete().neq("id","_")}tx=[];saveL();render()}
@@ -521,90 +523,86 @@ function closeDrill(){document.getElementById("dm").classList.add("hid");drillBu
 function render(){
   const now=new Date(),cm=mk(now),pd=st.pay_day,dl2=dleft(pd);
   const mt=tx.filter(t=>mk(t.created_at)===cm);
-  // Budget tracks ALL spend (amex + debit)
+  // Last week spend for carry-forward
   const lwd=mt.filter(t=>t.bucket==="daily"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
   const lws=mt.filter(t=>t.bucket==="splurge"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
-  // Calculate overspend carry-forward
-  const dailyOverspend=Math.max(0,lwd-st.daily_weekly);
-  const splurgeOverspend=Math.max(0,lws-st.splurge_weekly);
-  const adjDailyCap=Math.max(0,st.daily_weekly-dailyOverspend);
-  const adjSplurgeCap=Math.max(0,st.splurge_weekly-splurgeOverspend);
-  const wd=mt.filter(t=>t.bucket==="daily"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
-  const ws=mt.filter(t=>t.bucket==="splurge"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
-  // Bills and monthly totals
-  const mbt=mt.filter(t=>t.bucket==="bill").reduce((s,t)=>s+t.amount,0);
-  const mdt=mt.filter(t=>t.bucket==="daily").reduce((s,t)=>s+t.amount,0);
-  const mst=mt.filter(t=>t.bucket==="splurge").reduce((s,t)=>s+t.amount,0);
-  const total=mdt+mst+mbt;
-  // Update header AFTER all calculations
-  document.getElementById("hs").textContent=`Daily ${adjDailyCap}/wk · Splurge ${adjSplurgeCap}/wk · Pay: ${DAYS[pd]}`;
-
-  // Amex-only totals for direct debit tracking and points
-  const amxTotal=mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0);
-  const dbtTotal=mt.filter(t=>t.card==="debit").reduce((s,t)=>s+t.amount,0);
-
+  // Carry-forward: if over last week, tighten this week
+  const dailyOver=Math.round(Math.max(0,lwd-st.daily_weekly));
+  const splurgeOver=Math.round(Math.max(0,lws-st.splurge_weekly));
+  const adjDaily=Math.round(Math.max(0,st.daily_weekly-dailyOver));
+  const adjSplurge=Math.round(Math.max(0,st.splurge_weekly-splurgeOver));
+  // This week
+  const wd=Math.round(mt.filter(t=>t.bucket==="daily"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0));
+  const ws=Math.round(mt.filter(t=>t.bucket==="splurge"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0));
+  // Monthly totals (savings excluded from caps but included in total)
+  const mbt=Math.round(mt.filter(t=>t.bucket==="bill").reduce((s,t)=>s+t.amount,0));
+  const mdt=Math.round(mt.filter(t=>t.bucket==="daily").reduce((s,t)=>s+t.amount,0));
+  const mst=Math.round(mt.filter(t=>t.bucket==="splurge").reduce((s,t)=>s+t.amount,0));
+  const msv=Math.round(mt.filter(t=>t.bucket==="savings").reduce((s,t)=>s+t.amount,0));
+  const total=mdt+mst+mbt+msv;
+  // Amex-only totals
+  const amxTotal=Math.round(mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0));
+  const dbtTotal=Math.round(mt.filter(t=>t.card==="debit").reduce((s,t)=>s+t.amount,0));
+  document.getElementById("hs").textContent=`Daily $${adjDaily}/wk · Splurge $${adjSplurge}/wk · Pay: ${DAYS[pd]}`;
   document.getElementById("ap").textContent=Math.floor(mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0)*1.25).toLocaleString();
   const wr=pwRange(pd);
-
   let h="";
-  h+=bcard("DAILY - THIS WEEK",wr,wd,adjDailyCap,dl2,lwd,st.daily_weekly,"openDrill('daily',true)",dailyOverspend);
-  h+=bcard("SPLURGE - THIS WEEK",wr,ws,adjSplurgeCap,dl2,lws,st.splurge_weekly,"openDrill('splurge',true)",splurgeOverspend);
+  h+=bcard("DAILY - THIS WEEK",wr,wd,adjDaily,dl2,Math.round(lwd),st.daily_weekly,"openDrill('daily',true)",dailyOver);
+  h+=bcard("SPLURGE - THIS WEEK",wr,ws,adjSplurge,dl2,Math.round(lws),st.splurge_weekly,"openDrill('splurge',true)",splurgeOver);
   const bmp=Math.min(100,mbt/st.bills_monthly*100),bmr=Math.max(0,st.bills_monthly-mbt),bc2=bcol(bmp);
-  h+=`<div class="cd cdp" style="border-left-color:${bc2};cursor:pointer" onclick="openDrill('bill',false)"><div class="ch"><div><div class="lb">BILLS - THIS MONTH</div><div class="dr">${now.toLocaleString("default",{month:"long",year:"numeric"})}</div></div><div class="ca"><span style="color:${bc2}">$${mbt.toFixed(0)}</span><span class="cc"> / $${st.bills_monthly}</span></div></div><div class="tk"><div class="br" style="width:${bmp}%;background:${bc2}"></div></div><div class="rr"><span class="ok">$${bmr.toFixed(0)} remaining</span></div></div>`;
-
-  // Total card with Amex vs Debit split
+  h+=`<div class="cd cdp" style="border-left-color:${bc2};cursor:pointer" onclick="openDrill('bill',false)"><div class="ch"><div><div class="lb">BILLS - THIS MONTH</div><div class="dr">${now.toLocaleString("default",{month:"long",year:"numeric"})}</div></div><div class="ca"><span style="color:${bc2}">$${mbt}</span><span class="cc"> / $${st.bills_monthly}</span></div></div><div class="tk"><div class="br" style="width:${bmp}%;background:${bc2}"></div></div><div class="rr"><span class="ok">$${Math.round(bmr)} remaining</span></div></div>`;
+  // Savings card (if any)
+  if(msv>0){
+    h+=`<div class="cd" style="cursor:pointer;border-left:5px solid var(--ochre)" onclick="openDrill('savings',false)"><div class="ch"><div><div class="lb">SAVINGS PURCHASES</div><div class="dr">${now.toLocaleString("default",{month:"long"})}</div></div><div class="ca"><span style="color:var(--ochre)">$${msv}</span></div></div><div style="font-size:10px;color:var(--text3)">Not counted in weekly budgets</div></div>`;
+  }
+  // Monthly totals card
   const amxPts=Math.floor(amxTotal*1.25);
-  const mattT=mt.filter(t=>t.bucket!=="bill"&&t.who==="matt").reduce((s,t)=>s+t.amount,0);
-  const lizT=mt.filter(t=>t.bucket!=="bill"&&t.who==="liz").reduce((s,t)=>s+t.amount,0);
-  h+=`<div class="cd tcd"><div class="lb">MONTHLY TOTALS</div><div class="ti2"><div><div class="ta">$${total.toFixed(0)}</div><div class="ts">all spend this month</div></div><div style="text-align:right"><div class="tp">✈️ ${amxPts.toLocaleString()}</div><div class="ts">points (Amex only)</div></div></div>`;
-  h+=`<div class="card-split">💳 Amex: <span class="amx">$${amxTotal.toFixed(0)}</span>&nbsp;&nbsp;🏦 Debit: <span class="dbt">$${dbtTotal.toFixed(0)}</span></div>`;
-  if(mattT>0||lizT>0)h+=`<div class="split">Matt: <b>$${mattT.toFixed(0)}</b>&nbsp;&nbsp;Liz: <b>$${lizT.toFixed(0)}</b></div>`;
+  const mattT=Math.round(mt.filter(t=>t.bucket!=="bill"&&t.bucket!=="savings"&&t.who==="matt").reduce((s,t)=>s+t.amount,0));
+  const lizT=Math.round(mt.filter(t=>t.bucket!=="bill"&&t.bucket!=="savings"&&t.who==="liz").reduce((s,t)=>s+t.amount,0));
+  h+=`<div class="cd tcd"><div class="lb">MONTHLY TOTALS</div><div class="ti2"><div><div class="ta">$${total}</div><div class="ts">all spend this month</div></div><div style="text-align:right"><div class="tp">✈️ ${amxPts.toLocaleString()}</div><div class="ts">points (Amex only)</div></div></div>`;
+  h+=`<div class="card-split">💳 Amex: <span class="amx">$${amxTotal}</span>&nbsp;&nbsp;🏦 Debit: <span class="dbt">$${dbtTotal}</span></div>`;
+  if(mattT>0||lizT>0)h+=`<div class="split">Matt: <b>$${mattT}</b>&nbsp;&nbsp;Liz: <b>$${lizT}</b></div>`;
   const bp=Math.min(100,amxTotal/5000*100);
-  h+=`<div class="tb2">Sign-up bonus: $${amxTotal.toFixed(0)} / $5,000 (${Math.round(bp)}%)<div class="tbb"><div class="tbf" style="width:${bp}%"></div></div></div></div>`;
-
+  h+=`<div class="tb2">Sign-up bonus: $${amxTotal} / $5,000 (${Math.round(bp)}%)<div class="tbb"><div class="tbf" style="width:${bp}%"></div></div></div></div>`;
   const scs=SC.map(c=>({...c,t:mt.filter(t=>t.bucket==="splurge"&&t.category===c.id).reduce((s,t)=>s+t.amount,0)})).filter(c=>c.t>0).sort((a,b)=>b.t-a.t);
   if(scs.length){h+=`<div class="cd"><div class="lb">SPLURGE BREAKDOWN</div><div style="display:flex;flex-direction:column;gap:8px">`;scs.forEach(c=>{h+=`<div class="cr"><span class="ci">${c.i}</span><span class="cn2">${c.l}</span><div class="cbt"><div class="cbf" style="width:${c.t/scs[0].t*100}%"></div></div><span class="cra">$${c.t.toFixed(0)}</span></div>`});h+=`</div></div>`}
   h+=`<button class="fab" onclick="go('add')">+ Add Spend</button>`;
   document.getElementById("v-dash").innerHTML=h;
-
   // Add / Bills forms
   ["add","bills"].forEach(v2=>{
     const cats=fB==="daily"?DC:fB==="splurge"?SC:BCC;
-    let f=`<div class="cd"><div class="lb">${fB==="bill"?"LOG A BILL":fB==="splurge"?"LOG SPLURGE":"LOG DAILY SPEND"}</div>`;
-    f+=`<div class="tgr"><button class="tg${fB==="daily"?" on":""}" onclick="fB='daily';fC='groceries';render()">Daily</button><button class="tg${fB==="splurge"?" on":""}" onclick="fB='splurge';fC='eating_out';render()">Splurge</button><button class="tg${fB==="bill"?" on":""}" onclick="fB='bill';fC='electricity';render()">Bill</button></div>`;
+    let f=`<div class="cd"><div class="lb">${fB==="bill"?"LOG A BILL":fB==="splurge"?"LOG SPLURGE":fB==="savings"?"LOG SAVINGS PURCHASE":"LOG DAILY SPEND"}</div>`;
+    f+=`<div class="tgr"><button class="tg${fB==="daily"?" on":""}" onclick="fB='daily';fC='groceries';render()">Daily</button><button class="tg${fB==="splurge"?" on":""}" onclick="fB='splurge';fC='eating_out';render()">Splurge</button><button class="tg${fB==="bill"?" on":""}" onclick="fB='bill';fC='electricity';render()">Bill</button><button class="tg${fB==="savings"?" on":""}" onclick="fB='savings';fC='one_off';render()">Savings</button></div>`;
     f+=`<div class="aw"><span class="dl">$</span><input type="number" id="fa" class="ai2" placeholder="0.00"></div>`;
     f+=`<div class="fl">Card</div><div class="tgr"><button class="tg${fCard==="amex"?" on-amx":""}" onclick="fCard='amex';render()">💳 Amex</button><button class="tg${fCard==="debit"?" on-dbt":""}" onclick="fCard='debit';render()">🏦 Debit</button></div>`;
     f+=`<div class="fl">Who?</div><div class="tgr"><button class="tg${fW==="matt"?" on":""}" onclick="fW='matt';render()">Matt</button><button class="tg${fW==="liz"?" on":""}" onclick="fW='liz';render()">Liz</button></div>`;
     f+=`<div class="fl">Category</div><div class="cg">`;
     cats.forEach(c=>{f+=`<button class="cbb${fC===c.id?" on":""}" onclick="fC='${c.id}';render()"><span class="cbi">${c.i}</span><span class="cbl">${c.l}</span></button>`});
     f+=`</div><div class="fl">Note</div><input type="text" id="fn" class="tin" placeholder="${fB==="bill"?"e.g. Q3 electricity":"e.g. Aldi weekly shop"}">`;
-    f+=`<button class="sb" id="fs" onclick="addTxn()">${fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":"Add Daily"}</button></div>`;
+    f+=`<button class="sb" id="fs" onclick="addTxn()">${fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":fB==="savings"?"Add Savings":"Add Daily"}</button></div>`;
     document.getElementById("v-"+v2).innerHTML=f;
   });
-
   renderScan();
-
   // History
   let hi=`<div class="hh"><div class="lb">THIS MONTH · tap to edit</div>${tx.length?`<button class="rb" onclick="resetAll()">Clear All</button>`:""}</div>`;
   if(!mt.length){hi+=`<div class="empty">No transactions yet.<small>Tap Add or Scan to get started.</small></div>`}
-  else{mt.forEach(t=>{const c=fc(t.category),d=new Date(t.created_at),tg=t.bucket==="daily"?"d":t.bucket==="splurge"?"s":"b",tl=t.bucket==="daily"?"DAILY":t.bucket==="splurge"?"SPLURGE":"BILL",cw=inCW(t.created_at,pd),isDebit=t.card==="debit";
+  else{mt.forEach(t=>{const c=fc(t.category),d=new Date(t.created_at),tg=t.bucket==="daily"?"d":t.bucket==="splurge"?"s":t.bucket==="savings"?"sv":"b",tl=t.bucket==="daily"?"DAILY":t.bucket==="splurge"?"SPLURGE":t.bucket==="savings"?"SAVINGS":"BILL",cw=inCW(t.created_at,pd),isDebit=t.card==="debit";
     hi+=`<div class="tr" onclick="openEdit('${t.id}')"><div class="trl"><span style="font-size:17px">${c.i}</span><div><div class="trc">${c.l}<span class="trw"> - ${t.who==="matt"?"Matt":"Liz"}</span><span class="tag tag-${tg}">${tl}</span>${isDebit?`<span class="tag tag-dbt">DEBIT</span>`:""}</div>${t.note?`<div class="trn">${t.note}</div>`:""}<div class="trd">${d.toLocaleDateString("en-AU",{day:"numeric",month:"short",weekday:"short"})}${cw?" · this week":""}${isDebit?"":" · 💳"}</div></div></div><div class="trr"><div class="tra">$${t.amount.toFixed(2)}</div><span style="color:var(--text3);font-size:16px">›</span></div></div>`})}
   document.getElementById("v-hist").innerHTML=hi;
 }
-
 function bcard(title,range,spent,cap,dl2,lastWk,baseCap,onclick,overspend){
-  const pct=Math.min(100,spent/cap*100),rem=Math.max(0,cap-spent),c=bcol(pct);
-  let h=`<div class="cd cdp" style="border-left-color:${c}${onclick?";cursor:pointer":""}" ${onclick?`onclick="${onclick}"`:""}><div class="ch"><div><div class="lb">${title}</div><div class="dr">${range}</div></div><div class="ca"><span style="color:${c}">$${spent.toFixed(0)}</span><span class="cc"> / $${cap}</span></div></div><div class="tk"><div class="br" style="width:${pct}%;background:${c}"></div></div><div class="rr">`;
-  if(overspend>0)h+=`<div style="font-size:10px;color:var(--over);margin-bottom:8px;font-weight:600">⚠️ Adjusted: -${overspend.toFixed(0)} carried from last week (was ${baseCap})</div>`;
-  if(pct>=100)h+=`<span class="ov">⚠️ Over by $${(spent-cap).toFixed(0)} - use debit!</span>`;
-  else if(pct>=80)h+=`<span class="wn">⚡ $${rem.toFixed(0)} left - slow down</span>`;
-  else h+=`<span class="ok">$${rem.toFixed(0)} remaining</span>`;
-  if(pct<100)h+=`<span class="pd2">~$${(rem/dl2).toFixed(0)}/day</span>`;
+  const pct=cap>0?Math.min(100,spent/cap*100):100,rem=Math.max(0,cap-spent),c=bcol(pct);
+  let h=`<div class="cd cdp" style="border-left-color:${c}${onclick?";cursor:pointer":""}" ${onclick?`onclick="${onclick}"`:""}><div class="ch"><div><div class="lb">${title}</div><div class="dr">${range}</div></div><div class="ca"><span style="color:${c}">$${spent}</span><span class="cc"> / $${cap}</span></div></div>`;
+  if(overspend>0)h+=`<div style="font-size:10px;color:var(--over);margin-bottom:8px">Tighter week: $${overspend} over last week</div>`;
+  h+=`<div class="tk"><div class="br" style="width:${pct}%;background:${c}"></div></div><div class="rr">`;
+  if(pct>=100)h+=`<span class="ov">⚠️ Over by $${spent-cap} - use debit!</span>`;
+  else if(pct>=80)h+=`<span class="wn">⚡ $${rem} left - slow down</span>`;
+  else h+=`<span class="ok">$${rem} remaining</span>`;
+  if(pct<100)h+=`<span class="pd2">~$${Math.round(rem/dl2)}/day</span>`;
   h+=`</div>`;
-  if(lastWk>0)h+=`<div class="fn-row">Last week: ${lastWk.toFixed(0)} ${lastWk>(baseCap||cap)?`<span style="color:var(--over)">(over ${(lastWk-(baseCap||cap)).toFixed(0)})</span>`:`<span style="color:var(--sage-deep)">(${((baseCap||cap)-lastWk).toFixed(0)} under)</span>`}</div>`;
+  if(lastWk>0)h+=`<div class="fn-row">Last week: $${lastWk} ${lastWk>baseCap?`<span style="color:var(--over)">(over $${lastWk-baseCap})</span>`:`<span style="color:var(--sage-deep)">($${baseCap-lastWk} under)</span>`}</div>`;
   h+=`</div>`;return h;
 }
-
 window.addEventListener("load",async()=>{loadL();await initSB();if(sessionStorage.getItem("ax")==="1"){document.getElementById("lock").classList.add("hid");document.getElementById("app").classList.remove("hid");render()}});
 </script>
 </body>
