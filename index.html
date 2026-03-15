@@ -520,23 +520,24 @@ function closeDrill(){document.getElementById("dm").classList.add("hid");drillBu
 // ═══ RENDER ═══
 function render(){
   const now=new Date(),cm=mk(now),pd=st.pay_day,dl2=dleft(pd);
-  document.getElementById("hs").textContent=`Daily ${adjDailyCap}/wk · Splurge ${adjSplurgeCap}/wk · Pay: ${DAYS[pd]}`;
   const mt=tx.filter(t=>mk(t.created_at)===cm);
   // Budget tracks ALL spend (amex + debit)
   const lwd=mt.filter(t=>t.bucket==="daily"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
   const lws=mt.filter(t=>t.bucket==="splurge"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
-  // Calculate overspend carry-forward: if last week was over, reduce this week's cap
+  // Calculate overspend carry-forward
   const dailyOverspend=Math.max(0,lwd-st.daily_weekly);
   const splurgeOverspend=Math.max(0,lws-st.splurge_weekly);
   const adjDailyCap=Math.max(0,st.daily_weekly-dailyOverspend);
   const adjSplurgeCap=Math.max(0,st.splurge_weekly-splurgeOverspend);
-  // Current week spend
   const wd=mt.filter(t=>t.bucket==="daily"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
   const ws=mt.filter(t=>t.bucket==="splurge"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
+  // Bills and monthly totals
   const mbt=mt.filter(t=>t.bucket==="bill").reduce((s,t)=>s+t.amount,0);
   const mdt=mt.filter(t=>t.bucket==="daily").reduce((s,t)=>s+t.amount,0);
   const mst=mt.filter(t=>t.bucket==="splurge").reduce((s,t)=>s+t.amount,0);
   const total=mdt+mst+mbt;
+  // Update header AFTER all calculations
+  document.getElementById("hs").textContent=`Daily ${adjDailyCap}/wk · Splurge ${adjSplurgeCap}/wk · Pay: ${DAYS[pd]}`;
 
   // Amex-only totals for direct debit tracking and points
   const amxTotal=mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0);
