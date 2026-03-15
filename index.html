@@ -574,7 +574,7 @@ function render(){
   const mc=mPct>pacePct+10?"var(--over)":mPct>pacePct?"var(--ochre)":"var(--sage-deep)";
   let h="";
   h+='<div class="cd" style="border-left:5px solid '+mc+'"><div class="lb">MONTHLY LIVING SPEND</div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px"><div style="font-family:'Instrument Serif',serif;font-size:28px;color:'+mc+'">$'+livingSpend+'</div><div style="font-size:13px;color:var(--text3)">of $'+monthlyLivingCap+'</div></div>';
+  h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px"><div style="font-family:\'Instrument Serif\',serif;font-size:28px;color:'+mc+'">$'+livingSpend+'</div><div style="font-size:13px;color:var(--text3)">of $'+monthlyLivingCap+'</div></div>';
   h+='<div style="position:relative"><div class="tk"><div class="br" style="width:'+mPct+'%;background:'+mc+'"></div></div><div style="position:absolute;top:-2px;left:'+pacePct+'%;width:2px;height:11px;background:var(--text3);border-radius:1px"></div></div>';
   h+='<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px"><span>'+mPct+'% spent</span><span>|</span><span>pace: '+pacePct+'%</span></div>';
   if(livingSpend>monthlyLivingCap){
@@ -594,8 +594,8 @@ function render(){
     h+='<div class="cd" style="background:var(--over-bg);border-color:var(--terra-border)"><div class="lb" style="color:var(--over)">GETTING BACK ON TRACK</div>';
     h+='<div style="font-size:12px;color:var(--text);margin-top:6px">Over by <b>$'+totalWeekOver+'</b> this week. To recover:</div>';
     h+='<div style="display:flex;gap:10px;margin-top:10px">';
-    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:'Instrument Serif',serif;font-size:22px;color:var(--terra)">$'+dailyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per day rest of month</div></div>';
-    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:'Instrument Serif',serif;font-size:22px;color:var(--terra)">$'+weeklyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per week rest of month</div></div>';
+    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$'+dailyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per day rest of month</div></div>';
+    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$'+weeklyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per week rest of month</div></div>';
     h+='</div></div>';
   }
   const bmp=Math.min(100,mbt/st.bills_monthly*100),bmr=Math.max(0,st.bills_monthly-mbt),bc2=bcol(bmp);
