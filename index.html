@@ -367,8 +367,7 @@ CATEGORISATION RULES:
 Here is how the user has previously categorised similar merchants:
 ${merchantHistory}
 
-IMPORTANT: Return ONLY a JSON array, no markdown, no backticks, no explanation. Skip ALL of the following - do NOT include them:
-- Pending transactions
+IMPORTANT: Return ONLY a JSON array, no markdown, no backticks, no explanation. Include pending transactions - they are real purchases. Skip ALL of the following - do NOT include them:
 - Non-purchase entries like "Plan It" labels
 - Transfers between accounts (e.g. "Transfer to", "Transfer from", "Internal transfer", "Bill payment to own account", money moved to savings/mortgage/bills accounts)
 - Direct debits for loan repayments, mortgage payments, or car finance
@@ -498,9 +497,17 @@ async function confirmScan(){
 function openDrill(bucket,weekOnly){
   drillBucket=bucket;
   const cm=mk(new Date()),pd=st.pay_day;
-  const mt=tx.filter(t=>mk(t.created_at)===cm&&t.bucket===bucket);
-  const items=weekOnly?mt.filter(t=>inCW(t.created_at,pd)):mt;
-  const title=bucket==="daily"?"Daily"+(weekOnly?" - This Week":" - Month"):bucket==="splurge"?"Splurge"+(weekOnly?" - This Week":" - Month"):"Bills - This Month";
+  let items;
+  let title;
+  if(bucket==="living"){
+    const mt=tx.filter(t=>mk(t.created_at)===cm&&(t.bucket==="daily"||t.bucket==="splurge"));
+    items=mt;
+    title="Living Spend - This Month";
+  }else{
+    const mt=tx.filter(t=>mk(t.created_at)===cm&&t.bucket===bucket);
+    items=weekOnly?mt.filter(t=>inCW(t.created_at,pd)):mt;
+    title=bucket==="daily"?"Daily"+(weekOnly?" - This Week":" - Month"):bucket==="splurge"?"Splurge"+(weekOnly?" - This Week":" - Month"):bucket==="savings"?"Savings - This Month":"Bills - This Month";
+  }
   document.getElementById("dm-title").textContent=title;
   let h="";
   if(!items.length){h=`<div class="empty">No transactions.<small>Nothing in this bucket yet.</small></div>`}
@@ -587,7 +594,7 @@ function render(){
   let h="";
 
   // ── CARD 1: Monthly living spend overview ──
-  h+=`<div class="cd" style="border-left:5px solid ${mc}"><div class="lb">MONTHLY LIVING SPEND</div>`;
+  h+=`<div class="cd" style="border-left:5px solid ${mc};cursor:pointer" onclick="openDrill('living',false)"><div class="lb">MONTHLY LIVING SPEND</div>`;
   h+=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px"><div style="font-family:'Instrument Serif',serif;font-size:28px;color:${mc}">$${livingSpend}</div><div style="font-size:13px;color:var(--text3)">of $${monthlyLivingCap}</div></div>`;
   h+=`<div style="position:relative"><div class="tk"><div class="br" style="width:${mPct}%;background:${mc}"></div></div><div style="position:absolute;top:-2px;left:${pacePct}%;width:2px;height:11px;background:var(--text3);border-radius:1px"></div></div>`;
   h+=`<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px"><span>${mPct}% spent</span><span>|</span><span>pace: ${pacePct}%</span></div>`;
