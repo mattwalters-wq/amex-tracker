@@ -612,15 +612,15 @@ function render(){
   document.getElementById("v-dash").innerHTML=h;
   ["add","bills"].forEach(v2=>{
     const cats=fB==="daily"?DC:fB==="splurge"?SC:BCC;
-    let f='<div class="cd"><div class="lb">'+(fB==="bill"?"LOG A BILL":fB==="splurge"?"LOG SPLURGE":fB==="savings"?"LOG SAVINGS PURCHASE":"LOG DAILY SPEND")+'</div>';
-    f+='<div class="tgr"><button class="tg'+(fB==="daily"?" on":"")+'" onclick="fB=\'daily\';fC=\'groceries\';render()">Daily</button><button class="tg'+(fB==="splurge"?" on":"")+'" onclick="fB=\'splurge\';fC=\'eating_out\';render()">Splurge</button><button class="tg'+(fB==="bill"?" on":"")+'" onclick="fB=\'bill\';fC=\'electricity\';render()">Bill</button><button class="tg'+(fB==="savings"?" on":"")+'" onclick="fB=\'savings\';fC=\'one_off\';render()">Savings</button></div>';
-    f+='<div class="aw"><span class="dl">$</span><input type="number" id="fa" class="ai2" placeholder="0.00"></div>';
-    f+='<div class="fl">Card</div><div class="tgr"><button class="tg'+(fCard==="amex"?" on-amx":"")+'" onclick="fCard=\'amex\';render()">💳 Amex</button><button class="tg'+(fCard==="debit"?" on-dbt":"")+'" onclick="fCard=\'debit\';render()">🏦 Debit</button></div>';
-    f+='<div class="fl">Who?</div><div class="tgr"><button class="tg'+(fW==="matt"?" on":"")+'" onclick="fW=\'matt\';render()">Matt</button><button class="tg'+(fW==="liz"?" on":"")+'" onclick="fW=\'liz\';render()">Liz</button></div>';
-    f+='<div class="fl">Category</div><div class="cg">';
-    cats.forEach(c=>{f+='<button class="cbb'+(fC===c.id?" on":"")+'" onclick="fC=''+c.id+'';render()"><span class="cbi">'+c.i+'</span><span class="cbl">'+c.l+'</span></button>'});
-    f+='</div><div class="fl">Note</div><input type="text" id="fn" class="tin" placeholder="'+(fB==="bill"?"e.g. Q3 electricity":"e.g. Aldi weekly shop")+'">';
-    f+='<button class="sb" id="fs" onclick="addTxn()">'+(fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":fB==="savings"?"Add Savings":"Add Daily")+'</button></div>';
+    let f=`<div class="cd"><div class="lb">${fB==="bill"?"LOG A BILL":fB==="splurge"?"LOG SPLURGE":fB==="savings"?"LOG SAVINGS PURCHASE":"LOG DAILY SPEND"}</div>`;
+    f+=`<div class="tgr"><button class="tg${fB==="daily"?" on":""}" onclick="fB='daily';fC='groceries';render()">Daily</button><button class="tg${fB==="splurge"?" on":""}" onclick="fB='splurge';fC='eating_out';render()">Splurge</button><button class="tg${fB==="bill"?" on":""}" onclick="fB='bill';fC='electricity';render()">Bill</button><button class="tg${fB==="savings"?" on":""}" onclick="fB='savings';fC='one_off';render()">Savings</button></div>`;
+    f+=`<div class="aw"><span class="dl">$</span><input type="number" id="fa" class="ai2" placeholder="0.00"></div>`;
+    f+=`<div class="fl">Card</div><div class="tgr"><button class="tg${fCard==="amex"?" on-amx":""}" onclick="fCard='amex';render()">💳 Amex</button><button class="tg${fCard==="debit"?" on-dbt":""}" onclick="fCard='debit';render()">🏦 Debit</button></div>`;
+    f+=`<div class="fl">Who?</div><div class="tgr"><button class="tg${fW==="matt"?" on":""}" onclick="fW='matt';render()">Matt</button><button class="tg${fW==="liz"?" on":""}" onclick="fW='liz';render()">Liz</button></div>`;
+    f+=`<div class="fl">Category</div><div class="cg">`;
+    cats.forEach(c=>{f+=`<button class="cbb${fC===c.id?" on":""}" onclick="fC='${c.id}';render()"><span class="cbi">${c.i}</span><span class="cbl">${c.l}</span></button>`});
+    f+=`</div><div class="fl">Note</div><input type="text" id="fn" class="tin" placeholder="${fB==="bill"?"e.g. Q3 electricity":"e.g. Aldi weekly shop"}">`;
+    f+=`<button class="sb" id="fs" onclick="addTxn()">${fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":fB==="savings"?"Add Savings":"Add Daily"}</button></div>`;
     document.getElementById("v-"+v2).innerHTML=f;
   });
   renderScan();
