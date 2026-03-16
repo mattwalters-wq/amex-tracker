@@ -202,7 +202,7 @@ input[type="number"]{-moz-appearance:textfield}
 
 <script>
 const SUPABASE_URL="https://cvuznuccqquqqramcqzn.supabase.co";
-const SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN2dXpudWNjcXF1cXFyYW1jcXpuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMzU5MDUsImV4cCI6MjA4ODYxMTkwNX0._wwzBR4lGUdRLa7AcxHsf3BBy6KQU3CZTbzN4CT3sOM";
+const SUPABASE_KEY="PASTE_KEY_HERE";
 
 const DAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const DC=[{id:"groceries",l:"Groceries",i:"🛒"},{id:"fuel",l:"Fuel",i:"⛽"},{id:"health",l:"Health",i:"💊"},{id:"kids",l:"Kids",i:"👧"},{id:"pets",l:"Pets",i:"🐾"},{id:"transport",l:"Transport",i:"🚗"},{id:"shopping",l:"Shopping",i:"🛍"},{id:"garden",l:"Garden",i:"🌿"},{id:"other_daily",l:"Other",i:"📦"}];
@@ -253,7 +253,7 @@ async function fetchAll(){
 }
 
 async function initSB(){
-  if(!SUPABASE_URL||SUPABASE_URL==="YOUR_SUPABASE_URL"){uL=true;loadL();sdot("off");return}
+  if(!SUPABASE_URL||SUPABASE_URL==="https://cvuznuccqquqqramcqzn.supabase.co"){uL=true;loadL();sdot("off");return}
   try{
     sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
     const{data:s2}=await sb.from("settings").select("*").eq("id","main").single();
@@ -353,7 +353,7 @@ For each transaction return a JSON array of objects with these fields:
 - "merchant": the merchant name as shown
 - "amount": the dollar amount as a number (no $ sign)
 - "date": the date in YYYY-MM-DD format. If the date is not visible for a transaction, use today's date: ${new Date().toISOString().split("T")[0]}
-- "bucket": one of "daily", "splurge", or "bill"
+- "bucket": one of "daily", "splurge", "bill", or "savings"
 - "category": one of these IDs: ${catList}
 - "who": default to "matt"
 
@@ -375,7 +375,6 @@ IMPORTANT: Return ONLY a JSON array, no markdown, no backticks, no explanation. 
 - Centrelink payments
 - Salary or wage deposits
 - Any transaction that is money moving between the user's own accounts rather than a purchase from a merchant
-
 Only include actual purchases from merchants, shops, restaurants, service providers, and billers.`;
 
   try{
@@ -432,7 +431,6 @@ async function confirmScan(){
   out.innerHTML=`<div class="cd" style="text-align:center;padding:30px"><div class="scan-spinner"></div><div style="font-size:13px;color:var(--text2);margin-top:8px">Adding ${toAdd.length} transactions...</div></div>`;
 
   const newTxns=toAdd.map(r=>{
-    // Robust date parsing - try multiple formats, fall back to now
     let dt=new Date();
     if(r.date){
       const d=new Date(r.date+"T12:00:00");
@@ -508,10 +506,10 @@ function openDrill(bucket,weekOnly){
   if(!items.length){h=`<div class="empty">No transactions.<small>Nothing in this bucket yet.</small></div>`}
   else{
     const total=items.reduce((s,t)=>s+t.amount,0);
-    h+=`<div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600">Total: ${total.toFixed(2)} · ${items.length} transactions</div>`;
+    h+=`<div style="font-size:12px;color:var(--text2);margin-bottom:12px;font-weight:600">Total: $${total.toFixed(2)} · ${items.length} transactions</div>`;
     items.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at)).forEach(t=>{
       const c=fc(t.category),d=new Date(t.created_at),isDebit=t.card==="debit";
-      h+=`<div class="tr" style="margin-bottom:6px" onclick="event.stopPropagation();closeDrill();openEdit('${t.id}')"><div class="trl"><span style="font-size:16px">${c.i}</span><div><div class="trc">${c.l}<span class="trw"> - ${t.who==="matt"?"Matt":"Liz"}</span>${isDebit?'<span class="tag tag-dbt">DEBIT</span>':""}</div>${t.note?'<div class="trn">'+t.note+'</div>':""}<div class="trd">${d.toLocaleDateString("en-AU",{day:"numeric",month:"short",weekday:"short"})}</div></div></div><div class="trr"><div class="tra">${t.amount.toFixed(2)}</div><span style="color:var(--text3);font-size:16px">›</span></div></div>`;
+      h+=`<div class="tr" style="margin-bottom:6px" onclick="event.stopPropagation();closeDrill();openEdit('${t.id}')"><div class="trl"><span style="font-size:16px">${c.i}</span><div><div class="trc">${c.l}<span class="trw"> - ${t.who==="matt"?"Matt":"Liz"}</span>${isDebit?`<span class="tag tag-dbt">DEBIT</span>`:""}</div>${t.note?`<div class="trn">${t.note}</div>`:""}<div class="trd">${d.toLocaleDateString("en-AU",{day:"numeric",month:"short",weekday:"short"})}</div></div></div><div class="trr"><div class="tra">$${t.amount.toFixed(2)}</div><span style="color:var(--text3);font-size:16px">›</span></div></div>`;
     });
   }
   document.getElementById("dm-list").innerHTML=h;
@@ -519,7 +517,6 @@ function openDrill(bucket,weekOnly){
 }
 function closeDrill(){document.getElementById("dm").classList.add("hid");drillBucket=null}
 
-// ═══ RENDER ═══
 function weekCard(label,spent,cap,dl2,over,onclick){
   const pct=cap>0?Math.min(100,Math.round(spent/cap*100)):100;
   const rem=Math.max(0,cap-spent);
@@ -536,27 +533,41 @@ function weekCard(label,spent,cap,dl2,over,onclick){
   return h;
 }
 
+// ═══ RENDER ═══
 function render(){
   const now=new Date(),cm=mk(now),pd=st.pay_day,dl2=dleft(pd);
   const mt=tx.filter(t=>mk(t.created_at)===cm);
+
+  // Last week spend for carry-forward
   const lwd=mt.filter(t=>t.bucket==="daily"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
   const lws=mt.filter(t=>t.bucket==="splurge"&&inLW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0);
+
+  // Carry-forward: if over last week, tighten this week
   const dailyOver=Math.round(Math.max(0,lwd-st.daily_weekly));
   const splurgeOver=Math.round(Math.max(0,lws-st.splurge_weekly));
   const adjDaily=Math.round(Math.max(0,st.daily_weekly-dailyOver));
   const adjSplurge=Math.round(Math.max(0,st.splurge_weekly-splurgeOver));
+
+  // This week
   const wd=Math.round(mt.filter(t=>t.bucket==="daily"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0));
   const ws=Math.round(mt.filter(t=>t.bucket==="splurge"&&inCW(t.created_at,pd)).reduce((s,t)=>s+t.amount,0));
+
+  // Monthly totals (savings excluded from caps but included in total)
   const mbt=Math.round(mt.filter(t=>t.bucket==="bill").reduce((s,t)=>s+t.amount,0));
   const mdt=Math.round(mt.filter(t=>t.bucket==="daily").reduce((s,t)=>s+t.amount,0));
   const mst=Math.round(mt.filter(t=>t.bucket==="splurge").reduce((s,t)=>s+t.amount,0));
   const msv=Math.round(mt.filter(t=>t.bucket==="savings").reduce((s,t)=>s+t.amount,0));
   const total=mdt+mst+mbt+msv;
+
+  // Amex-only totals
   const amxTotal=Math.round(mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0));
   const dbtTotal=Math.round(mt.filter(t=>t.card==="debit").reduce((s,t)=>s+t.amount,0));
+
+  // Monthly budget derived from weekly caps
   const daysInMonth=new Date(now.getFullYear(),now.getMonth()+1,0).getDate();
   const dayOfMonth=now.getDate();
-  document.getElementById("hs").textContent=now.toLocaleString("default",{month:"long"})+" · Day "+dayOfMonth+" of "+daysInMonth+" · Pay: "+DAYS[pd];
+
+  document.getElementById("hs").textContent=`${now.toLocaleString("default",{month:"long"})} · Day ${dayOfMonth} of ${daysInMonth} · Pay: ${DAYS[pd]}`;
   document.getElementById("ap").textContent=Math.floor(mt.filter(t=>(t.card||"amex")==="amex").reduce((s,t)=>s+t.amount,0)*1.25).toLocaleString();
   const daysLeft=daysInMonth-dayOfMonth+1;
   const weeksInMonth=daysInMonth/7;
@@ -572,44 +583,60 @@ function render(){
   const pacePct=Math.round((dayOfMonth/daysInMonth)*100);
   const onTrack=mPct<=pacePct+5;
   const mc=mPct>pacePct+10?"var(--over)":mPct>pacePct?"var(--ochre)":"var(--sage-deep)";
+
   let h="";
-  h+='<div class="cd" style="border-left:5px solid '+mc+'"><div class="lb">MONTHLY LIVING SPEND</div>';
-  h+='<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px"><div style="font-family:\'Instrument Serif\',serif;font-size:28px;color:'+mc+'">$'+livingSpend+'</div><div style="font-size:13px;color:var(--text3)">of $'+monthlyLivingCap+'</div></div>';
-  h+='<div style="position:relative"><div class="tk"><div class="br" style="width:'+mPct+'%;background:'+mc+'"></div></div><div style="position:absolute;top:-2px;left:'+pacePct+'%;width:2px;height:11px;background:var(--text3);border-radius:1px"></div></div>';
-  h+='<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px"><span>'+mPct+'% spent</span><span>|</span><span>pace: '+pacePct+'%</span></div>';
+
+  // ── CARD 1: Monthly living spend overview ──
+  h+=`<div class="cd" style="border-left:5px solid ${mc}"><div class="lb">MONTHLY LIVING SPEND</div>`;
+  h+=`<div style="display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 10px"><div style="font-family:'Instrument Serif',serif;font-size:28px;color:${mc}">$${livingSpend}</div><div style="font-size:13px;color:var(--text3)">of $${monthlyLivingCap}</div></div>`;
+  h+=`<div style="position:relative"><div class="tk"><div class="br" style="width:${mPct}%;background:${mc}"></div></div><div style="position:absolute;top:-2px;left:${pacePct}%;width:2px;height:11px;background:var(--text3);border-radius:1px"></div></div>`;
+  h+=`<div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-top:4px"><span>${mPct}% spent</span><span>|</span><span>pace: ${pacePct}%</span></div>`;
   if(livingSpend>monthlyLivingCap){
-    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--over-bg);border-radius:10px;font-size:12px;color:var(--over)">Over budget by $'+(livingSpend-monthlyLivingCap)+'. Switch to debit for remaining spend.</div>';
+    h+=`<div style="margin-top:12px;padding:10px 12px;background:var(--over-bg);border-radius:10px;font-size:12px;color:var(--over)">Over budget by $${livingSpend-monthlyLivingCap}. Switch to debit for remaining spend.</div>`;
   }else if(onTrack){
-    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--sage-bg);border-radius:10px;font-size:12px;color:var(--sage-deep)">On track. <b>$'+dailyBudgetRest+'/day</b> for the rest of the month.</div>';
+    h+=`<div style="margin-top:12px;padding:10px 12px;background:var(--sage-bg);border-radius:10px;font-size:12px;color:var(--sage-deep)">On track. <b>$${dailyBudgetRest}/day</b> for the rest of the month.</div>`;
   }else{
-    h+='<div style="margin-top:12px;padding:10px 12px;background:var(--ochre-bg);border-radius:10px;font-size:12px;color:var(--ochre)">Ahead of pace. Aim for <b>$'+dailyBudgetRest+'/day</b> to stay on budget.</div>';
+    h+=`<div style="margin-top:12px;padding:10px 12px;background:var(--ochre-bg);border-radius:10px;font-size:12px;color:var(--ochre)">Ahead of pace. Aim for <b>$${dailyBudgetRest}/day</b> to stay on budget.</div>`;
   }
-  h+='<div style="font-size:10px;color:var(--text3);margin-top:6px">Daily $'+mdt+' + Splurge $'+mst+' · '+daysLeft+' days left</div></div>';
-  h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  h+=`<div style="font-size:10px;color:var(--text3);margin-top:6px">Daily $${mdt} + Splurge $${mst} · ${daysLeft} days left</div></div>`;
+
+  // ── CARD 2 & 3: Weekly compact cards ──
+  h+=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">`;
   h+=weekCard("Daily",wd,adjDaily,dl2,dailyOver,"openDrill('daily',true)");
   h+=weekCard("Splurge",ws,adjSplurge,dl2,splurgeOver,"openDrill('splurge',true)");
-  h+='</div>';
+  h+=`</div>`;
+
+  // ── Recovery card (only when over this week) ──
   if(wd>adjDaily||ws>adjSplurge){
     const totalWeekOver=Math.max(0,wd-adjDaily)+Math.max(0,ws-adjSplurge);
-    h+='<div class="cd" style="background:var(--over-bg);border-color:var(--terra-border)"><div class="lb" style="color:var(--over)">GETTING BACK ON TRACK</div>';
-    h+='<div style="font-size:12px;color:var(--text);margin-top:6px">Over by <b>$'+totalWeekOver+'</b> this week. To recover:</div>';
-    h+='<div style="display:flex;gap:10px;margin-top:10px">';
-    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$'+dailyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per day rest of month</div></div>';
-    h+='<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:\'Instrument Serif\',serif;font-size:22px;color:var(--terra)">$'+weeklyBudgetRest+'</div><div style="font-size:9px;color:var(--text3)">per week rest of month</div></div>';
-    h+='</div></div>';
+    h+=`<div class="cd" style="background:var(--over-bg);border-color:var(--terra-border)"><div class="lb" style="color:var(--over)">GETTING BACK ON TRACK</div>`;
+    h+=`<div style="font-size:12px;color:var(--text);margin-top:6px">Over by <b>$${totalWeekOver}</b> this week. To recover:</div>`;
+    h+=`<div style="display:flex;gap:10px;margin-top:10px">`;
+    h+=`<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:'Instrument Serif',serif;font-size:22px;color:var(--terra)">$${dailyBudgetRest}</div><div style="font-size:9px;color:var(--text3)">per day rest of month</div></div>`;
+    h+=`<div style="flex:1;text-align:center;padding:10px;background:var(--card);border-radius:10px"><div style="font-family:'Instrument Serif',serif;font-size:22px;color:var(--terra)">$${weeklyBudgetRest}</div><div style="font-size:9px;color:var(--text3)">per week rest of month</div></div>`;
+    h+=`</div></div>`;
   }
+
+  // ── Bills ──
   const bmp=Math.min(100,mbt/st.bills_monthly*100),bmr=Math.max(0,st.bills_monthly-mbt),bc2=bcol(bmp);
-  h+='<div class="cd cdp" style="border-left-color:'+bc2+';cursor:pointer" onclick="openDrill(\'bill\',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">BILLS</div><div style="font-size:10px;color:var(--text3)">$'+Math.round(bmr)+' remaining</div></div><div style="font-size:18px;font-weight:700;color:'+bc2+'">$'+mbt+'<span style="font-size:11px;color:var(--text3);font-weight:400"> / $'+st.bills_monthly+'</span></div></div></div>';
+  h+=`<div class="cd cdp" style="border-left-color:${bc2};cursor:pointer" onclick="openDrill('bill',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">BILLS</div><div style="font-size:10px;color:var(--text3)">$${Math.round(bmr)} remaining</div></div><div style="font-size:18px;font-weight:700;color:${bc2}">$${mbt}<span style="font-size:11px;color:var(--text3);font-weight:400"> / $${st.bills_monthly}</span></div></div></div>`;
+
+  // ── Savings ──
   if(msv>0){
-    h+='<div class="cd" style="cursor:pointer;border-left:5px solid var(--ochre)" onclick="openDrill(\'savings\',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">SAVINGS PURCHASES</div><div style="font-size:10px;color:var(--text3)">Not in weekly budgets</div></div><div style="font-size:18px;font-weight:700;color:var(--ochre)">$'+msv+'</div></div></div>';
+    h+=`<div class="cd" style="cursor:pointer;border-left:5px solid var(--ochre)" onclick="openDrill('savings',false)"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">SAVINGS PURCHASES</div><div style="font-size:10px;color:var(--text3)">Not in weekly budgets</div></div><div style="font-size:18px;font-weight:700;color:var(--ochre)">$${msv}</div></div></div>`;
   }
+
+  // ── Amex / Points ──
   const amxPts=Math.floor(amxTotal*1.25);
-  h+='<div class="cd tcd"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">AMEX THIS MONTH</div><div style="font-size:11px;color:var(--text2);margin-top:2px">💳 $'+amxTotal+' · 🏦 $'+dbtTotal+'</div></div><div style="text-align:right"><div class="tp">✈️ '+amxPts.toLocaleString()+'</div><div style="font-size:9px;color:var(--text3)">QF points</div></div></div>';
+  h+=`<div class="cd tcd"><div style="display:flex;justify-content:space-between;align-items:center"><div><div class="lb">AMEX THIS MONTH</div><div style="font-size:11px;color:var(--text2);margin-top:2px">💳 $${amxTotal} · 🏦 $${dbtTotal}</div></div><div style="text-align:right"><div class="tp">✈️ ${amxPts.toLocaleString()}</div><div style="font-size:9px;color:var(--text3)">QF points</div></div></div>`;
   const bp=Math.min(100,amxTotal/5000*100);
-  if(bp<100)h+='<div class="tb2">Bonus: $'+amxTotal+' / $5,000 ('+Math.round(bp)+'%)<div class="tbb"><div class="tbf" style="width:'+bp+'%"></div></div></div>';
-  h+='</div>';
-  h+='<button class="fab" onclick="go(\'add\')">+ Add Spend</button>';
+  if(bp<100)h+=`<div class="tb2">Bonus: $${amxTotal} / $5,000 (${Math.round(bp)}%)<div class="tbb"><div class="tbf" style="width:${bp}%"></div></div></div>`;
+  h+=`</div>`;
+
+  h+=`<button class="fab" onclick="go('add')">+ Add Spend</button>`;
   document.getElementById("v-dash").innerHTML=h;
+
+  // Add / Bills forms
   ["add","bills"].forEach(v2=>{
     const cats=fB==="daily"?DC:fB==="splurge"?SC:BCC;
     let f=`<div class="cd"><div class="lb">${fB==="bill"?"LOG A BILL":fB==="splurge"?"LOG SPLURGE":fB==="savings"?"LOG SAVINGS PURCHASE":"LOG DAILY SPEND"}</div>`;
@@ -623,11 +650,14 @@ function render(){
     f+=`<button class="sb" id="fs" onclick="addTxn()">${fB==="bill"?"Add Bill":fB==="splurge"?"Add Splurge":fB==="savings"?"Add Savings":"Add Daily"}</button></div>`;
     document.getElementById("v-"+v2).innerHTML=f;
   });
+
   renderScan();
-  let hi='<div class="hh"><div class="lb">THIS MONTH · tap to edit</div>'+(tx.length?'<button class="rb" onclick="resetAll()">Clear All</button>':'')+'</div>';
-  if(!mt.length){hi+='<div class="empty">No transactions yet.<small>Tap Add or Scan to get started.</small></div>'}
+
+  // History
+  let hi=`<div class="hh"><div class="lb">THIS MONTH · tap to edit</div>${tx.length?`<button class="rb" onclick="resetAll()">Clear All</button>`:""}</div>`;
+  if(!mt.length){hi+=`<div class="empty">No transactions yet.<small>Tap Add or Scan to get started.</small></div>`}
   else{mt.forEach(t=>{const c=fc(t.category),d=new Date(t.created_at),tg=t.bucket==="daily"?"d":t.bucket==="splurge"?"s":t.bucket==="savings"?"sv":"b",tl=t.bucket==="daily"?"DAILY":t.bucket==="splurge"?"SPLURGE":t.bucket==="savings"?"SAVINGS":"BILL",cw=inCW(t.created_at,pd),isDebit=t.card==="debit";
-    hi+='<div class="tr" onclick="openEdit(''+t.id+'')"><div class="trl"><span style="font-size:17px">'+c.i+'</span><div><div class="trc">'+c.l+'<span class="trw"> - '+(t.who==="matt"?"Matt":"Liz")+'</span><span class="tag tag-'+tg+'">'+tl+'</span>'+(isDebit?'<span class="tag tag-dbt">DEBIT</span>':'')+  '</div>'+(t.note?'<div class="trn">'+t.note+'</div>':'')+'<div class="trd">'+d.toLocaleDateString("en-AU",{day:"numeric",month:"short",weekday:"short"})+(cw?" · this week":"")+(isDebit?"":" · 💳")+'</div></div></div><div class="trr"><div class="tra">$'+t.amount.toFixed(2)+'</div><span style="color:var(--text3);font-size:16px">›</span></div></div>'})}
+    hi+=`<div class="tr" onclick="openEdit('${t.id}')"><div class="trl"><span style="font-size:17px">${c.i}</span><div><div class="trc">${c.l}<span class="trw"> - ${t.who==="matt"?"Matt":"Liz"}</span><span class="tag tag-${tg}">${tl}</span>${isDebit?`<span class="tag tag-dbt">DEBIT</span>`:""}</div>${t.note?`<div class="trn">${t.note}</div>`:""}<div class="trd">${d.toLocaleDateString("en-AU",{day:"numeric",month:"short",weekday:"short"})}${cw?" · this week":""}${isDebit?"":" · 💳"}</div></div></div><div class="trr"><div class="tra">$${t.amount.toFixed(2)}</div><span style="color:var(--text3);font-size:16px">›</span></div></div>`})}
   document.getElementById("v-hist").innerHTML=hi;
 }
 
