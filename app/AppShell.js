@@ -12,6 +12,7 @@ import ScanPage from './scan/ScanPage'
 import ReportsPage from './reports/ReportsPage'
 import TransactionsPage from './transactions/TransactionsPage'
 import SettingsPage from './settings/SettingsPage'
+import ChatPage from './chat/ChatPage'
 
 export default function AppShell() {
   const pathname = usePathname()
@@ -65,6 +66,8 @@ export default function AppShell() {
 
   const renderPage = () => {
     switch (pathname) {
+      case '/chat':
+        return <ChatPage transactions={transactions} settings={settings} />
       case '/add':
         return <AddPage onAdd={addTransaction} />
       case '/scan':

@@ -20,6 +20,11 @@ const NAV_ITEMS = [
       <path d="M7 12h10" strokeLinecap="round"/>
     </svg>
   )},
+  { href: '/chat', label: 'Chat', icon: (active) => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5} className="w-5 h-5">
+      <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  )},
   { href: '/reports', label: 'Reports', icon: (active) => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? 2 : 1.5} className="w-5 h-5">
       <path d="M18 20V10M12 20V4M6 20v-6" strokeLinecap="round" strokeLinejoin="round"/>
