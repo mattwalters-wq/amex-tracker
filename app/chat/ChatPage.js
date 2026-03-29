@@ -100,20 +100,65 @@ function buildContext(transactions, settings) {
   const totalPoints = transactions
     .filter(t => t.card === 'amex')
     .reduce((s, t) => s + Math.floor(Number(t.amount) * 1.25), 0)
-
-  const merchantTotals = {}
-  cycleTx.forEach(tx => { merchantTotals[tx.note || 'Unknown'] = (merchantTotals[tx.note || 'Unknown'] || 0) + Number(tx.amount) })
-  const topMerchants = Object.entries(merchantTotals).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>n+': '+fmtAUD(v))
-
-  const recent = [...transactions]
-    .sort((a,b)=>new Date(b.created_at)-new Date(a.created_at))
-    .slice(0, 30)
-    .map(tx => {
-      const d = typeof tx.created_at==='string' ? parseISO(tx.created_at) : new Date(tx.created_at)
-      return '['+tx.id+'] '+format(d,'d MMM')+' - '+(tx.note||tx.category)+' '+fmtAUD(tx.amount)+' ('+tx.bucket+', '+tx.card+', '+tx.who+')'+(tx.isDuplicate?' [DUPLICATE]':'')
-    })
-
   const dupes = transactions.filter(t => t.isDuplicate)
+
+  // --- ALL-TIME merchant totals (for pattern questions like "how much at Coles ever") ---
+  const allMerchantTotals = {}
+  transactions.forEach(tx => {
+    const key = (tx.note || 'Unknown').trim()
+    allMerchantTotals[key] = (allMerchantTotals[key] || 0) + Number(tx.amount)
+  })
+  const topAllMerchants = Object.entries(allMerchantTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 20)
+    .map(([n, v]) => n + ': ' + fmtAUD(v))
+
+  // --- ALL-TIME category totals ---
+  const allCategoryTotals = {}
+  transactions.forEach(tx => {
+    allCategoryTotals[tx.category] = (allCategoryTotals[tx.category] || 0) + Number(tx.amount)
+  })
+  const topCategories = Object.entries(allCategoryTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([k, v]) => k + ': ' + fmtAUD(v))
+
+  // --- Month-by-month totals (all time) ---
+  const monthTotals = {}
+  transactions.forEach(tx => {
+    const d = typeof tx.created_at === 'string' ? parseISO(tx.created_at) : new Date(tx.created_at)
+    const key = format(d, 'MMM yyyy')
+    if (!monthTotals[key]) monthTotals[key] = { daily: 0, splurge: 0, bill: 0, savings: 0, total: 0 }
+    monthTotals[key][tx.bucket] = (monthTotals[key][tx.bucket] || 0) + Number(tx.amount)
+    monthTotals[key].total += Number(tx.amount)
+  })
+  const monthSummary = Object.entries(monthTotals)
+    .sort((a, b) => new Date('01 ' + a[0]) - new Date('01 ' + b[0]))
+    .map(([m, v]) => m + ': total ' + fmtAUD(v.total) + ' (daily ' + fmtAUD(v.daily) + ', splurge ' + fmtAUD(v.splurge) + ', bills ' + fmtAUD(v.bill) + ', savings ' + fmtAUD(v.savings) + ')')
+
+  // --- Per-person totals all time ---
+  const mattTotal = transactions.filter(t => t.who === 'matt').reduce((s, t) => s + Number(t.amount), 0)
+  const lizTotal = transactions.filter(t => t.who === 'liz').reduce((s, t) => s + Number(t.amount), 0)
+
+  // --- This cycle top merchants ---
+  const cycleMerchantTotals = {}
+  cycleTx.forEach(tx => {
+    const key = (tx.note || 'Unknown').trim()
+    cycleMerchantTotals[key] = (cycleMerchantTotals[key] || 0) + Number(tx.amount)
+  })
+  const topCycleMerchants = Object.entries(cycleMerchantTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(([n, v]) => n + ': ' + fmtAUD(v))
+
+  // --- Recent transactions with IDs (for tool use) ---
+  const recent = [...transactions]
+    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+    .slice(0, 40)
+    .map(tx => {
+      const d = typeof tx.created_at === 'string' ? parseISO(tx.created_at) : new Date(tx.created_at)
+      return '[' + tx.id + '] ' + format(d, 'd MMM yyyy') + ' - ' + (tx.note || tx.category) + ' ' + fmtAUD(tx.amount) + ' (' + tx.bucket + ', ' + tx.card + ', ' + tx.who + ')' + (tx.isDuplicate ? ' [DUPLICATE]' : '')
+    })
 
   return `You are an agentic financial assistant for Matt and Liz Walters. You can read their data AND make changes using tools. Be direct, casual, and specific. No fluff. No em dashes.
 
@@ -121,30 +166,40 @@ TODAY: ${format(new Date(), 'd MMMM yyyy')}
 CURRENT CYCLE: ${cycle.label} (${cycle.daysLeft} days left)
 
 BUDGETS:
-- Daily: ${fmtAUD(dailyCap)}/wk (this week cap: ${fmtAUD(dailyCarry.adjustedBudget)}${dailyCarry.carryNote ? ', '+dailyCarry.carryNote : ''})
-- Splurge: ${fmtAUD(splurgeCap)}/wk (this week cap: ${fmtAUD(splurgeCarry.adjustedBudget)}${splurgeCarry.carryNote ? ', '+splurgeCarry.carryNote : ''})
+- Daily: ${fmtAUD(dailyCap)}/wk (this week cap: ${fmtAUD(dailyCarry.adjustedBudget)}${dailyCarry.carryNote ? ', ' + dailyCarry.carryNote : ''})
+- Splurge: ${fmtAUD(splurgeCap)}/wk (this week cap: ${fmtAUD(splurgeCarry.adjustedBudget)}${splurgeCarry.carryNote ? ', ' + splurgeCarry.carryNote : ''})
 - Bills: ${fmtAUD(billsCap)}/month | Savings: no cap
 
-THIS CYCLE: living ${fmtAUD(cycleLiving)} of ${fmtAUD(cycleLivingBudget)} | daily ${fmtAUD(sumBucket(cycleTx,'daily'))} | splurge ${fmtAUD(sumBucket(cycleTx,'splurge'))} | bills ${fmtAUD(sumBucket(cycleTx,'bill'))} | savings ${fmtAUD(sumBucket(cycleTx,'savings'))}
-THIS WEEK: daily ${fmtAUD(sumBucket(weekTx,'daily'))} | splurge ${fmtAUD(sumBucket(weekTx,'splurge'))}
-AMEX/DEBIT SPLIT: ${fmtAUD(sumCard(cycleTx,'amex'))} / ${fmtAUD(sumCard(cycleTx,'debit'))}
-QF POINTS (all time): ~${totalPoints.toLocaleString()} | Japan (2 pax business): ~280,000 needed | to go: ~${Math.max(0,280000-totalPoints).toLocaleString()}
+THIS CYCLE: living ${fmtAUD(cycleLiving)} of ${fmtAUD(cycleLivingBudget)} | daily ${fmtAUD(sumBucket(cycleTx, 'daily'))} | splurge ${fmtAUD(sumBucket(cycleTx, 'splurge'))} | bills ${fmtAUD(sumBucket(cycleTx, 'bill'))} | savings ${fmtAUD(sumBucket(cycleTx, 'savings'))}
+THIS WEEK: daily ${fmtAUD(sumBucket(weekTx, 'daily'))} | splurge ${fmtAUD(sumBucket(weekTx, 'splurge'))}
+AMEX/DEBIT SPLIT (this cycle): ${fmtAUD(sumCard(cycleTx, 'amex'))} / ${fmtAUD(sumCard(cycleTx, 'debit'))}
+QF POINTS (all time): ~${totalPoints.toLocaleString()} | Japan (2 pax business): ~280,000 needed | to go: ~${Math.max(0, 280000 - totalPoints).toLocaleString()}
 
-${dupes.length > 0 ? 'DUPLICATES: '+dupes.length+' transactions flagged as duplicates' : 'No duplicates detected'}
+${dupes.length > 0 ? 'DUPLICATES: ' + dupes.length + ' transactions flagged as duplicates' : 'No duplicates detected'}
 
-TOP MERCHANTS THIS CYCLE:
-${topMerchants.join('\n')}
+THIS CYCLE TOP MERCHANTS:
+${topCycleMerchants.join('\n')}
 
-RECENT TRANSACTIONS (with IDs for tool use):
+ALL-TIME TOP MERCHANTS (use for pattern questions like "how much at Coles", "biggest splurge spots"):
+${topAllMerchants.join('\n')}
+
+ALL-TIME TOP CATEGORIES:
+${topCategories.join('\n')}
+
+SPENDING BY MONTH (all time - use for trend questions):
+${monthSummary.join('\n')}
+
+ALL-TIME BY PERSON: Matt ${fmtAUD(mattTotal)} | Liz ${fmtAUD(lizTotal)}
+TOTAL TRANSACTIONS: ${transactions.length} | Date range: ${monthSummary.length > 0 ? monthSummary[0].split(':')[0] + ' to ' + monthSummary[monthSummary.length - 1].split(':')[0] : 'unknown'}
+
+RECENT TRANSACTIONS WITH IDs (for tool use - delete/update by ID):
 ${recent.join('\n')}
-
-TOTAL: ${transactions.length} transactions
 
 INCOME: Matt ~$2,824/fn (UNIFIED), Liz ~$1,600/fn (architecture). Fixed (not on cards): mortgage $3,412/mo, car $558/mo, Centrelink $157/mo.
 
 TOOL USE GUIDANCE:
 - Use add_transaction when user describes a purchase
-- Use delete_transaction for duplicates or wrong entries - always include the ID from the list above
+- Use delete_transaction for duplicates or wrong entries - use the ID from the list above
 - Use update_transaction to fix bucket/category/amount/card errors
 - Use delete_duplicate_transactions only when user explicitly asks to clear all dupes
 - For ambiguous requests, ask one clarifying question before acting
