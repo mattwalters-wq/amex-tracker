@@ -67,7 +67,7 @@ export default function AppShell() {
   const renderPage = () => {
     switch (pathname) {
       case '/chat':
-        return <ChatPage transactions={transactions} settings={settings} />
+        return <ChatPage transactions={transactions} settings={settings} onAdd={addTransaction} onDelete={deleteTransaction} onUpdate={updateTransaction} onUpdateSettings={updateSettings} />
       case '/add':
         return <AddPage onAdd={addTransaction} />
       case '/scan':
