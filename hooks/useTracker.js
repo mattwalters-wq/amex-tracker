@@ -152,7 +152,8 @@ export function useTracker() {
     setTransactions(prev =>
       detectDuplicates(prev.map(t => t.id === id ? { ...t, ...updates } : t))
     )
-    const { error } = await supabase.from('transactions').update(updates).eq('id', id)
+    const { isDuplicate: _dup, ...dbUpdates } = updates
+    const { error } = await supabase.from('transactions').update(dbUpdates).eq('id', id)
     if (error) {
       setError(error.message)
       fetchAll(true) // rollback by refetching
