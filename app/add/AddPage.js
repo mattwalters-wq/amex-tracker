@@ -67,12 +67,12 @@ export default function AddPage({ onAdd }) {
       {/* Bucket */}
       <div className="mb-4">
         <div className="text-xs font-medium uppercase tracking-wider text-stone-400 mb-2">Bucket</div>
-        <div className="grid grid-cols-4 gap-2">
+        <div className="grid grid-cols-5 gap-1.5">
           {Object.values(BUCKETS).map(b => (
             <button
               key={b.id}
               onClick={() => handleBucket(b.id)}
-              className="py-2.5 rounded-xl text-sm font-medium border transition-all"
+              className="py-2.5 rounded-xl text-xs font-medium border transition-all"
               style={bucket === b.id
                 ? { background: b.color, color: 'white', borderColor: b.color }
                 : { background: b.light, color: b.color, borderColor: 'transparent' }}

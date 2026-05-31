@@ -60,7 +60,7 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
 
   const dailyMonthly = Math.round((settings.daily_weekly || 605) * 4.4)
   const splurgeMonthly = Math.round((settings.splurge_weekly || 250) * 4.4)
-  const totalMonthly = dailyMonthly + splurgeMonthly + (settings.bills_monthly || 1166)
+  const totalMonthly = dailyMonthly + splurgeMonthly + (settings.wine_monthly || 250) + (settings.bills_monthly || 1500)
 
   return (
     <div className="pb-24">
@@ -105,14 +105,32 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
             }
           />
           <SettingsRow
+            label="Wine monthly cap"
+            sub="Dedicated wine envelope"
+            right={
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium" style={{ color: '#8E5A7A' }}>$</span>
+                <input
+                  type="number"
+                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b pb-0.5"
+                  style={{ borderColor: 'rgba(142,90,122,0.4)' }}
+                  defaultValue={settings.wine_monthly || 250}
+                  onBlur={e => updateSetting('wine_monthly', e.target.value)}
+                />
+                <span className="text-xs text-stone-400">/mo</span>
+              </div>
+            }
+          />
+          <SettingsRow
             label="Bills monthly cap"
+            sub="Includes fuel, utilities, subscriptions"
             right={
               <div className="flex items-center gap-1">
                 <span className="text-sm font-medium text-ochre">$</span>
                 <input
                   type="number"
                   className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-ochre/40 pb-0.5"
-                  defaultValue={settings.bills_monthly || 1166}
+                  defaultValue={settings.bills_monthly || 1500}
                   onBlur={e => updateSetting('bills_monthly', e.target.value)}
                 />
                 <span className="text-xs text-stone-400">/mo</span>
@@ -121,7 +139,7 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
           />
           <SettingsRow
             label="Total monthly budget"
-            sub="Daily + Splurge + Bills"
+            sub="Daily + Splurge + Wine + Bills"
             right={<span className="text-sm font-medium text-stone-600">{fmtAUD(totalMonthly)}</span>}
           />
         </div>

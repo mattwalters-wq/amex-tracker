@@ -26,7 +26,8 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate }
   // Budget figures
   const dailyCap = settings.daily_weekly || 605
   const splurgeCap = settings.splurge_weekly || 250
-  const billsCap = settings.bills_monthly || 1166
+  const billsCap = settings.bills_monthly || 1500
+  const wineCap = settings.wine_monthly || 250
 
   const dailyCarry = useMemo(() => calcCarryForward(transactions, 'daily', dailyCap, settings.pay_day || 4), [transactions, dailyCap, settings])
   const splurgeCarry = useMemo(() => calcCarryForward(transactions, 'splurge', splurgeCap, settings.pay_day || 4), [transactions, splurgeCap, settings])
@@ -35,6 +36,7 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate }
   const cycleLiving = sumLiving(cycleTx)
   const cycleLivingBudget = (dailyCap * 4.4 + splurgeCap * 4.4)
   const cycleBills = sumBucket(cycleTx, 'bill')
+  const cycleWine = sumBucket(cycleTx, 'wine')
   const cycleSavings = sumBucket(cycleTx, 'savings')
   const cycleAmex = sumCard(cycleTx, 'amex')
   const cycleDebit = sumCard(cycleTx, 'debit')
@@ -184,24 +186,33 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate }
         </div>
       </div>
 
-      {/* Bills + Savings */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      {/* Bills + Wine + Savings */}
+      <div className="grid grid-cols-3 gap-3 mb-3">
         <div
           className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
           onClick={() => setDrillBucket('bill')}
         >
-          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Bills this cycle</div>
-          <div className="font-serif text-2xl mb-1 text-stone-800">{fmtAUD(cycleBills)}</div>
+          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Bills</div>
+          <div className={`font-serif text-xl mb-1 ${cycleBills > billsCap ? 'text-terra' : 'text-stone-800'}`}>{fmtAUD(cycleBills)}</div>
           <ProgressBar value={cycleBills} max={billsCap} color="#C49A4A" />
           <div className="text-[10px] text-stone-400 mt-1.5">of {fmtAUD(billsCap)}</div>
+        </div>
+        <div
+          className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
+          onClick={() => setDrillBucket('wine')}
+        >
+          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Wine</div>
+          <div className={`font-serif text-xl mb-1 ${cycleWine > wineCap ? 'text-terra' : 'text-stone-800'}`} style={{ color: cycleWine > wineCap ? undefined : '#8E5A7A' }}>{fmtAUD(cycleWine)}</div>
+          <ProgressBar value={cycleWine} max={wineCap} color="#8E5A7A" />
+          <div className="text-[10px] text-stone-400 mt-1.5">of {fmtAUD(wineCap)}</div>
         </div>
         <div
           className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
           onClick={() => setDrillBucket('savings')}
         >
           <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Savings</div>
-          <div className="font-serif text-2xl mb-1 text-olive">{fmtAUD(cycleSavings)}</div>
-          <div className="text-[10px] text-stone-400 mt-1.5">outside budget caps</div>
+          <div className="font-serif text-xl mb-1 text-olive">{fmtAUD(cycleSavings)}</div>
+          <div className="text-[10px] text-stone-400 mt-1.5">no cap</div>
         </div>
       </div>
 

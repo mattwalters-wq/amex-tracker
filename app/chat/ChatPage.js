@@ -21,7 +21,7 @@ const TOOLS = [
       properties: {
         note: { type: 'string', description: 'Merchant name or description' },
         amount: { type: 'number', description: 'Dollar amount (positive)' },
-        bucket: { type: 'string', enum: ['daily', 'splurge', 'bill', 'savings'], description: 'Budget bucket' },
+        bucket: { type: 'string', enum: ['daily', 'splurge', 'wine', 'bill', 'savings'], description: 'Budget bucket' },
         category: { type: 'string', description: 'Category id e.g. groceries, fuel, eating_out, coffee' },
         card: { type: 'string', enum: ['amex', 'debit'], description: 'Which card was used' },
         who: { type: 'string', enum: ['matt', 'liz'], description: 'Who made the purchase' },
@@ -51,7 +51,7 @@ const TOOLS = [
         id: { type: 'string', description: 'Transaction ID' },
         note: { type: 'string', description: 'Updated merchant name' },
         amount: { type: 'number', description: 'Updated amount' },
-        bucket: { type: 'string', enum: ['daily', 'splurge', 'bill', 'savings'] },
+        bucket: { type: 'string', enum: ['daily', 'splurge', 'wine', 'bill', 'savings'] },
         category: { type: 'string', description: 'Updated category id' },
         card: { type: 'string', enum: ['amex', 'debit'] },
         who: { type: 'string', enum: ['matt', 'liz'] },
@@ -92,7 +92,8 @@ function buildContext(transactions, settings) {
   const weekTx = filterByWeek(transactions, payDay)
   const dailyCap = settings.daily_weekly || 605
   const splurgeCap = settings.splurge_weekly || 250
-  const billsCap = settings.bills_monthly || 1166
+  const billsCap = settings.bills_monthly || 1500
+  const wineCap = settings.wine_monthly || 250
   const dailyCarry = calcCarryForward(transactions, 'daily', dailyCap, payDay)
   const splurgeCarry = calcCarryForward(transactions, 'splurge', splurgeCap, payDay)
   const cycleLiving = sumLiving(cycleTx)
@@ -168,9 +169,9 @@ CURRENT CYCLE: ${cycle.label} (${cycle.daysLeft} days left)
 BUDGETS:
 - Daily: ${fmtAUD(dailyCap)}/wk (this week cap: ${fmtAUD(dailyCarry.adjustedBudget)}${dailyCarry.carryNote ? ', ' + dailyCarry.carryNote : ''})
 - Splurge: ${fmtAUD(splurgeCap)}/wk (this week cap: ${fmtAUD(splurgeCarry.adjustedBudget)}${splurgeCarry.carryNote ? ', ' + splurgeCarry.carryNote : ''})
-- Bills: ${fmtAUD(billsCap)}/month | Savings: no cap
+- Bills: ${fmtAUD(billsCap)}/month (includes fuel) | Wine: ${fmtAUD(wineCap)}/month | Savings: no cap
 
-THIS CYCLE: living ${fmtAUD(cycleLiving)} of ${fmtAUD(cycleLivingBudget)} | daily ${fmtAUD(sumBucket(cycleTx, 'daily'))} | splurge ${fmtAUD(sumBucket(cycleTx, 'splurge'))} | bills ${fmtAUD(sumBucket(cycleTx, 'bill'))} | savings ${fmtAUD(sumBucket(cycleTx, 'savings'))}
+THIS CYCLE: living ${fmtAUD(cycleLiving)} of ${fmtAUD(cycleLivingBudget)} | daily ${fmtAUD(sumBucket(cycleTx, 'daily'))} | splurge ${fmtAUD(sumBucket(cycleTx, 'splurge'))} | wine ${fmtAUD(sumBucket(cycleTx, 'wine'))} | bills ${fmtAUD(sumBucket(cycleTx, 'bill'))} | savings ${fmtAUD(sumBucket(cycleTx, 'savings'))}
 THIS WEEK: daily ${fmtAUD(sumBucket(weekTx, 'daily'))} | splurge ${fmtAUD(sumBucket(weekTx, 'splurge'))}
 AMEX/DEBIT SPLIT (this cycle): ${fmtAUD(sumCard(cycleTx, 'amex'))} / ${fmtAUD(sumCard(cycleTx, 'debit'))}
 QF POINTS (all time): ~${totalPoints.toLocaleString()} | Japan (2 pax business): ~280,000 needed | to go: ~${Math.max(0, 280000 - totalPoints).toLocaleString()}
@@ -203,7 +204,16 @@ TOOL USE GUIDANCE:
 - Use update_transaction to fix bucket/category/amount/card errors
 - Use delete_duplicate_transactions only when user explicitly asks to clear all dupes
 - For ambiguous requests, ask one clarifying question before acting
-- After completing an action, confirm what you did in plain language`
+- After completing an action, confirm what you did in plain language
+
+STATEMENT RECONCILIATION (when a PDF or image is attached):
+- Read every transaction on the statement carefully
+- Cross-reference each one against the RECENT TRANSACTIONS list above
+- Identify: (1) transactions on statement but missing from the tracker, (2) possible duplicates, (3) transactions in the wrong bucket
+- For missing transactions, use add_transaction to add them - make a sensible bucket/category judgement based on merchant name
+- Skip: direct debit payments, credits, refunds, interest charges - these are not purchases
+- After reconciling, give a clear summary: how many added, how many already existed, any you flagged for review
+- Large one-off purchases (IKEA, furniture, medical, car) should go to savings bucket unless clearly a bill`
 }
 
 // Render a tool call as a visible action card
@@ -244,10 +254,10 @@ function ToolCallCard({ call, result }) {
 }
 
 const SUGGESTED = [
-  'Add $45 at Woolworths on Amex, daily',
+  'Add $45 at Coles on Amex, daily',
   'Delete all duplicates',
   'Are we on track this month?',
-  'Move the last Uber Eats to splurge',
+  'Move the last splurge to daily bucket',
   'How much have we spent at Coles?',
   'Where can we cut $200/month?',
 ]
@@ -258,7 +268,9 @@ export default function ChatPage({ transactions, settings, onAdd, onDelete, onUp
   })
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [attachment, setAttachment] = useState(null) // { name, base64, mediaType }
   const bottomRef = useRef()
+  const fileRef = useRef()
 
   const context = useMemo(() => buildContext(transactions, settings), [transactions, settings])
 
@@ -322,28 +334,62 @@ export default function ChatPage({ transactions, settings, onAdd, onDelete, onUp
     }
   }
 
+  const handleFileSelect = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const base64 = await new Promise((res, rej) => {
+      const reader = new FileReader()
+      reader.onload = () => res(reader.result.split(',')[1])
+      reader.onerror = () => rej(new Error('Read failed'))
+      reader.readAsDataURL(file)
+    })
+    setAttachment({ name: file.name, base64, mediaType: file.type || 'application/pdf' })
+    e.target.value = ''
+  }
+
   const send = async (text) => {
     const msg = (text || input).trim()
-    if (!msg || loading) return
+    if ((!msg && !attachment) || loading) return
     setInput('')
+    const currentAttachment = attachment
+    setAttachment(null)
 
     const apiKey = localStorage.getItem('anthropic_api_key')
     if (!apiKey) {
       setMessages(prev => [...prev,
-        { role: 'user', content: msg },
+        { role: 'user', content: msg || 'Reconcile this statement', attachmentName: currentAttachment?.name },
         { role: 'assistant', content: 'No Anthropic API key set. Add it in Settings first.' }
       ])
       return
     }
 
-    const userMsg = { role: 'user', content: msg }
+    const userMsg = { role: 'user', content: msg || 'Reconcile this statement against my transactions', attachmentName: currentAttachment?.name }
     const newMessages = [...messages, userMsg]
     setMessages(newMessages)
     setLoading(true)
 
-    // Build API messages - convert our display messages to API format
-    const apiMessages = newMessages.map(m => {
-      if (m.role === 'tool_result') return null // handled inline
+    // Build API messages - convert display messages to API format
+    // For the latest message, include attachment if present
+    const apiMessages = newMessages.map((m, idx) => {
+      if (m.role === 'tool_result') return null
+      // For the last user message, attach the document if present
+      if (idx === newMessages.length - 1 && m.role === 'user' && currentAttachment) {
+        const isPdf = currentAttachment.mediaType === 'application/pdf'
+        const contentBlocks = []
+        if (isPdf) {
+          contentBlocks.push({
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: currentAttachment.base64 },
+          })
+        } else {
+          contentBlocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: currentAttachment.mediaType, data: currentAttachment.base64 },
+          })
+        }
+        contentBlocks.push({ type: 'text', text: m.content })
+        return { role: 'user', content: contentBlocks }
+      }
       return { role: m.role, content: m.content }
     }).filter(Boolean)
 
@@ -458,7 +504,7 @@ export default function ChatPage({ transactions, settings, onAdd, onDelete, onUp
             <div className="bg-surface border border-black/[0.07] rounded-2xl p-4 mb-4">
               <div className="text-2xl mb-2">🤖</div>
               <p className="text-sm text-stone-600 leading-relaxed">
-                Ask questions or tell me what to do. I can add transactions, fix mistakes, delete duplicates, and update budgets.
+                Ask questions or tell me what to do. I can add transactions, fix mistakes, delete duplicates, and update budgets. Attach a PDF statement to reconcile the month.
               </p>
             </div>
             <div className="text-xs font-medium uppercase tracking-wider text-stone-400 mb-3">Try saying</div>
@@ -489,13 +535,18 @@ export default function ChatPage({ transactions, settings, onAdd, onDelete, onUp
                 </div>
               )}
               {/* Text bubble */}
-              {msg.content && (
+              {(msg.content || msg.attachmentName) && (
                 <div className={`rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                   msg.role === 'user'
                     ? 'bg-sage text-white rounded-tr-sm'
                     : 'bg-surface border border-black/[0.07] text-stone-800 rounded-tl-sm'
                 }`}>
-                  {msg.content.split('\n').map((line, j, arr) => (
+                  {msg.attachmentName && (
+                    <div className="flex items-center gap-1.5 mb-1.5 text-white/80 text-xs">
+                      <span>📄</span><span>{msg.attachmentName}</span>
+                    </div>
+                  )}
+                  {msg.content && msg.content.split('\n').map((line, j, arr) => (
                     <span key={j}>{line}{j < arr.length - 1 && <br />}</span>
                   ))}
                 </div>
@@ -521,11 +572,29 @@ export default function ChatPage({ transactions, settings, onAdd, onDelete, onUp
 
       {/* Input */}
       <div className="flex-shrink-0 px-4 pb-20 pt-2 border-t border-black/[0.06] bg-cream">
+        {/* Attachment preview */}
+        {attachment && (
+          <div className="flex items-center gap-2 mb-2 px-3 py-2 bg-sage-light border border-sage/20 rounded-xl">
+            <span className="text-sm">📄</span>
+            <span className="text-xs font-medium text-sage flex-1 truncate">{attachment.name}</span>
+            <button onClick={() => setAttachment(null)} className="text-sage/60 hover:text-terra text-sm leading-none">✕</button>
+          </div>
+        )}
         <div className="flex gap-2 items-end">
+          {/* Paperclip */}
+          <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={handleFileSelect} />
+          <button
+            onClick={() => fileRef.current?.click()}
+            className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 border border-black/[0.07] bg-surface hover:bg-sage-light transition-all text-stone-400 hover:text-sage"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} className="w-4 h-4">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
           <textarea
             rows={1}
             className="flex-1 bg-surface border border-black/[0.07] rounded-2xl px-4 py-3 text-sm resize-none focus:outline-none focus:border-sage max-h-32 leading-relaxed"
-            placeholder="Ask or tell me what to do..."
+            placeholder={attachment ? 'Add a message or just hit send...' : 'Ask or tell me what to do...'}
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {
@@ -535,9 +604,9 @@ export default function ChatPage({ transactions, settings, onAdd, onDelete, onUp
           />
           <button
             onClick={() => send()}
-            disabled={!input.trim() || loading}
+            disabled={(!input.trim() && !attachment) || loading}
             className={`w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 transition-all ${
-              input.trim() && !loading ? 'bg-sage text-white hover:bg-sage-dark' : 'bg-stone-200 text-stone-400'
+              (input.trim() || attachment) && !loading ? 'bg-sage text-white hover:bg-sage-dark' : 'bg-stone-200 text-stone-400'
             }`}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-4 h-4">

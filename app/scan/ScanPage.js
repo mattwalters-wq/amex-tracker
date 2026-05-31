@@ -4,7 +4,7 @@ import { useState, useRef } from 'react'
 import { BUCKETS, SKIP_MERCHANTS } from '../../lib/constants'
 import { sanitizeDate, detectDuplicates, fmtAUD } from '../../lib/utils'
 
-const BUCKET_ORDER = ['daily', 'splurge', 'bill', 'savings']
+const BUCKET_ORDER = ['daily', 'splurge', 'wine', 'bill', 'savings']
 
 function cycleBucket(current) {
   const idx = BUCKET_ORDER.indexOf(current)
@@ -58,11 +58,11 @@ RULES:
 - Include ALL purchases and pending transactions (pending = real purchases)
 - Skip: salary, Centrelink, transfers, loan repayments, mortgage direct debits, refunds/credits
 - Return ONLY a JSON array, no other text, no markdown fences
-- Each object: { "note": "merchant name", "amount": number (positive), "date": "YYYY-MM-DD or null if pending", "bucket": daily/splurge/bill/savings, "category": category id }
+- Each object: { "note": "merchant name", "amount": number (positive), "date": "YYYY-MM-DD or null if pending", "bucket": daily/splurge/wine/bill/savings, "category": category id }
 
-Buckets: daily=groceries/fuel/pharmacy/kids/pets/transport/hardware/garden, splurge=restaurants/cafes/coffee/takeaway/wine/bars, bill=Starlink/electricity/gas/water/phone/insurance/subscriptions/activities, savings=large one-off/clothing/gifts/tech
+Buckets: daily=groceries/pharmacy/kids/pets/transport/hardware/garden, splurge=restaurants/cafes/coffee/takeaway/bars, wine=bottle shop/wine delivery (Vinomofo, Langtons, Dan Murphy, BWS, Liquorland, Barrique)/cellar, bill=fuel(Ampol/BP/Shell/7-Eleven/United)/Starlink/electricity/gas/water/phone/insurance/subscriptions/activities/pilates, savings=large one-off/clothing/gifts/tech/furniture
 
-Category ids: groceries, fuel, health, kids, pets, transport, shopping, garden, other_daily, eating_out, coffee, wine, kb, market, other_splurge, internet, gas, electricity, phone, water, insurance, subscriptions, activities, other_bill, home, clothing, gifts, travel, tech, other_savings
+Category ids: groceries, health, kids, pets, transport, shopping, garden, other_daily, eating_out, coffee, kb, market, other_splurge, wine_shop, wine_delivery, wine_cellar, other_wine, fuel, internet, gas, electricity, phone, water, insurance, subscriptions, activities, other_bill, home, clothing, gifts, travel, tech, other_savings
 
 Card: ${card}
 Today: ${new Date().toISOString().split('T')[0]}
