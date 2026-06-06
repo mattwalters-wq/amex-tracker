@@ -79,7 +79,7 @@ export default function AppShell() {
       case '/settings':
         return <SettingsPage settings={settings} onUpdate={updateSettings} onLock={handleLock} />
       default:
-        return <Dashboard transactions={transactions} settings={settings} onDelete={deleteTransaction} onUpdate={updateTransaction} />
+        return <Dashboard transactions={transactions} settings={settings} onDelete={deleteTransaction} onUpdate={updateTransaction} onUpdateSettings={updateSettings} />
     }
   }
 
