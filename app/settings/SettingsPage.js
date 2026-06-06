@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BUCKETS } from '../../lib/constants'
+import { BUCKETS, SAFE_AMEX } from '../../lib/constants'
 import { fmtAUD } from '../../lib/utils'
 
 function Toggle({ on, onToggle }) {
@@ -184,6 +184,33 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
               </select>
             }
           />
+        </div>
+      </div>
+
+      {/* Amex */}
+      <div className="mb-5">
+        <div className="px-4 mb-2 text-[10px] font-medium uppercase tracking-wider text-stone-400">Amex</div>
+        <div className="bg-surface border-t border-b border-black/[0.07]">
+          <SettingsRow
+            label="Safe to spend / cycle"
+            sub="Max charge to still pay it off in full"
+            right={
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium text-sage">$</span>
+                <input
+                  type="number"
+                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-sage/40 pb-0.5"
+                  defaultValue={settings.amex_cycle_target || 4000}
+                  onBlur={e => updateSetting('amex_cycle_target', e.target.value)}
+                />
+                <span className="text-xs text-stone-400">/cyc</span>
+              </div>
+            }
+          />
+          <div className="px-4 py-3 text-[11px] text-stone-400 leading-relaxed">
+            Based on income {fmtAUD(SAFE_AMEX.monthlyIncome)}/mo less fixed commitments {fmtAUD(SAFE_AMEX.fixedCommitments)}/mo,
+            leaving ~{fmtAUD(SAFE_AMEX.monthlyIncome - SAFE_AMEX.fixedCommitments)}/mo. Suggested ceiling {fmtAUD(SAFE_AMEX.recommendedPerCycle)} keeps a savings buffer. Raise it to save less.
+          </div>
         </div>
       </div>
 

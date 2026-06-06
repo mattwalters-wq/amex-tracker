@@ -130,6 +130,10 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   const billsLeft = billsCap - cycleBills
   const wineLeft = wineCap - cycleWine
 
+  // Safe-to-spend on Amex this cycle (so it can be paid off in full)
+  const amexTarget = settings.amex_cycle_target || 4000
+  const amexHeadroom = amexTarget - cycleAmex
+
   // Amex balance reconciliation
   const actualBalance = settings.amex_actual_balance != null ? Number(settings.amex_actual_balance) : null
   const balanceAsOf = settings.amex_balance_updated_at || null
@@ -339,6 +343,18 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
             <div className="text-[10px] text-stone-400 mb-0.5">QF pts</div>
             <div className="font-serif text-xl text-ochre">{cyclePoints.toLocaleString()}</div>
           </div>
+        </div>
+
+        {/* Safe to spend this cycle (pay off in full) */}
+        <div className="border-t border-black/[0.06] pt-3 mb-3">
+          <div className="flex justify-between items-baseline mb-1.5">
+            <span className="text-[10px] uppercase tracking-wider text-stone-400">Safe to spend &middot; cap {fmtAUD(amexTarget)}</span>
+            {amexHeadroom >= 0
+              ? <span className="text-[11px]"><span className="text-olive font-medium">{fmtAUD(amexHeadroom)}</span> <span className="text-stone-400">left</span></span>
+              : <span className="text-[11px] text-terra font-medium">over by {fmtAUD(-amexHeadroom)}</span>}
+          </div>
+          <ProgressBar value={cycleAmex} max={amexTarget} color="#7A9E8E" />
+          <div className="text-[10px] text-stone-300 mt-1.5">Keeps the bill payable in full each cycle &middot; edit in Settings</div>
         </div>
 
         {/* Actual balance reconciliation */}
