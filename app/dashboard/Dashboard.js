@@ -12,25 +12,42 @@ import ProgressBar from '../../components/ProgressBar'
 import TxItem from '../../components/TxItem'
 import EditTxDrawer from '../../components/EditTxDrawer'
 
-function ReconcileModal({ open, current, trackedSpend, onSave, onClose }) {
-  const [value, setValue] = useState('')
+function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }) {
+  const [balance, setBalance] = useState('')
+  const [startBalance, setStartBalance] = useState('')
+  const [payments, setPayments] = useState('')
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (open) setValue(current != null ? String(current) : '')
-  }, [open, current])
+    if (!open) return
+    // Start balance + payments only carry over within the same cycle
+    const sameCycle = settings.amex_cycle_key === cycle.key
+    setBalance(settings.amex_actual_balance != null ? String(settings.amex_actual_balance) : '')
+    setStartBalance(sameCycle && settings.amex_cycle_start_balance != null ? String(settings.amex_cycle_start_balance) : '')
+    setPayments(sameCycle && Number(settings.amex_payments_cycle) ? String(settings.amex_payments_cycle) : '')
+  }, [open, settings, cycle])
 
   if (!open) return null
 
-  const num = parseFloat(value)
-  const valid = !isNaN(num) && num >= 0
+  const balNum = parseFloat(balance)
+  const startNum = startBalance.trim() === '' ? null : parseFloat(startBalance)
+  const payNum = payments.trim() === '' ? 0 : parseFloat(payments)
+  const valid = !isNaN(balNum) && balNum >= 0
+    && (startNum === null || (!isNaN(startNum) && startNum >= 0))
+    && !isNaN(payNum) && payNum >= 0
+
+  const expected = startNum != null && !isNaN(payNum) ? startNum + trackedSpend - payNum : null
+  const untracked = expected != null && !isNaN(balNum) ? balNum - expected : null
 
   const handleSave = async () => {
     if (!valid) return
     setSaving(true)
     await onSave({
-      amex_actual_balance: num,
+      amex_actual_balance: balNum,
       amex_balance_updated_at: new Date().toISOString(),
+      amex_cycle_start_balance: startNum,
+      amex_payments_cycle: payNum,
+      amex_cycle_key: cycle.key,
     })
     setSaving(false)
     onClose()
@@ -44,9 +61,10 @@ function ReconcileModal({ open, current, trackedSpend, onSave, onClose }) {
       >
         <h2 className="font-serif text-2xl mb-1">Reconcile Amex balance</h2>
         <p className="text-xs text-stone-400 mb-4">
-          Open the Amex app and enter the current Total Balance. This is the real balance owed — it can differ from tracked spend because it carries prior cycles and subtracts payments.
+          From the Amex app: the Total Balance now, what was owed when this cycle started ({fmtDate(cycle.start)} — usually last statement's closing balance), and payments made since. Then the gap to tracked spend shows what's missing.
         </p>
-        <div className="flex items-center gap-2 bg-surface border border-black/10 rounded-xl px-4 py-3 mb-4">
+        <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1 px-1">Total balance now</div>
+        <div className="flex items-center gap-2 bg-surface border border-black/10 rounded-xl px-4 py-3 mb-3">
           <span className="font-serif text-2xl text-stone-400">$</span>
           <input
             type="number"
@@ -54,13 +72,60 @@ function ReconcileModal({ open, current, trackedSpend, onSave, onClose }) {
             autoFocus
             className="flex-1 font-serif text-2xl bg-transparent outline-none text-stone-800"
             placeholder="0.00"
-            value={value}
-            onChange={e => setValue(e.target.value)}
+            value={balance}
+            onChange={e => setBalance(e.target.value)}
           />
         </div>
-        <div className="flex justify-between text-xs text-stone-400 mb-5 px-1">
-          <span>Tracked this cycle</span>
-          <span className="font-medium text-stone-600">{fmtAUD(trackedSpend)}</span>
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1 px-1">Owed at cycle start</div>
+            <div className="flex items-center gap-1.5 bg-surface border border-black/10 rounded-xl px-3 py-2.5">
+              <span className="font-serif text-lg text-stone-400">$</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                className="w-full font-serif text-lg bg-transparent outline-none text-stone-800"
+                placeholder="0.00"
+                value={startBalance}
+                onChange={e => setStartBalance(e.target.value)}
+              />
+            </div>
+          </div>
+          <div>
+            <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1 px-1">Paid this cycle</div>
+            <div className="flex items-center gap-1.5 bg-surface border border-black/10 rounded-xl px-3 py-2.5">
+              <span className="font-serif text-lg text-stone-400">$</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                className="w-full font-serif text-lg bg-transparent outline-none text-stone-800"
+                placeholder="0.00"
+                value={payments}
+                onChange={e => setPayments(e.target.value)}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="bg-surface border border-black/10 rounded-xl px-4 py-3 mb-5 text-xs">
+          <div className="flex justify-between text-stone-400">
+            <span>Tracked this cycle</span>
+            <span className="font-medium text-stone-600">{fmtAUD(trackedSpend)}</span>
+          </div>
+          {expected != null && (
+            <div className="flex justify-between text-stone-400 mt-1">
+              <span>Expected balance (start + tracked − paid)</span>
+              <span className="font-medium text-stone-600">{fmtAUD(expected)}</span>
+            </div>
+          )}
+          {untracked != null && (
+            <div className="mt-1.5 pt-1.5 border-t border-black/[0.06] font-medium">
+              {Math.abs(untracked) < 0.5
+                ? <span className="text-olive">✓ Matches the card — tracking is complete</span>
+                : untracked > 0
+                  ? <span className="text-ochre">{fmtAUD(untracked)} on the card isn't tracked yet</span>
+                  : <span className="text-stone-500">Tracked {fmtAUD(-untracked)} ahead of the card (refunds, pending or duplicates)</span>}
+            </div>
+          )}
         </div>
         <div className="flex gap-2">
           <button onClick={onClose} className="flex-1 py-3 rounded-xl text-sm font-medium text-stone-500 border border-black/10">
@@ -133,11 +198,20 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   // Safe-to-spend on Amex this cycle (so it can be paid off in full)
   const amexTarget = settings.amex_cycle_target || 4000
   const amexHeadroom = amexTarget - cycleAmex
+  // Always-on daily allowance: charging this much per remaining day lands the bill at cap.
+  // Underspend a day and tomorrow's number rises — the underspending mechanism.
+  const dailySafe = cycle.daysLeft > 0 ? amexHeadroom / cycle.daysLeft : amexHeadroom
 
-  // Amex balance reconciliation
+  // Amex balance reconciliation: actual = start + new charges - payments, so the
+  // tracking check is actual vs (start + tracked - payments). Snapshot/payments
+  // from a previous cycle are ignored.
   const actualBalance = settings.amex_actual_balance != null ? Number(settings.amex_actual_balance) : null
   const balanceAsOf = settings.amex_balance_updated_at || null
-  const balanceDiff = actualBalance != null ? cycleAmex - actualBalance : null
+  const sameCycle = settings.amex_cycle_key === cycle.key
+  const startBalance = sameCycle && settings.amex_cycle_start_balance != null ? Number(settings.amex_cycle_start_balance) : null
+  const cyclePayments = sameCycle ? Number(settings.amex_payments_cycle || 0) : 0
+  const expectedBalance = startBalance != null ? startBalance + cycleAmex - cyclePayments : null
+  const untrackedSpend = actualBalance != null && expectedBalance != null ? actualBalance - expectedBalance : null
 
   // Drill transactions
   const drillTx = useMemo(() => {
@@ -354,7 +428,18 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
               : <span className="text-[11px] text-terra font-medium">over by {fmtAUD(-amexHeadroom)}</span>}
           </div>
           <ProgressBar value={cycleAmex} max={amexTarget} color="#7A9E8E" />
-          <div className="text-[10px] text-stone-300 mt-1.5">Keeps the bill payable in full each cycle &middot; edit in Settings</div>
+          {amexHeadroom >= 0 && cycle.daysLeft > 0 ? (
+            <div className="mt-2 flex items-baseline gap-1.5">
+              <span className="font-serif text-lg leading-none text-olive">{fmtAUD(dailySafe)}</span>
+              <span className="text-[10px] text-stone-400">/day on the card for the next {cycle.daysLeft}d lands the bill right at cap</span>
+            </div>
+          ) : amexHeadroom >= 0 ? (
+            <div className="text-[10px] text-stone-400 mt-1.5">Cycle closes today &middot; {fmtAUD(amexHeadroom)} headroom left</div>
+          ) : (
+            <div className="mt-2 text-[10px] text-terra font-medium">
+              Cap reached &middot; put the rest of the cycle on debit to hold the bill at {fmtAUD(cycleAmex)}
+            </div>
+          )}
         </div>
 
         {/* Actual balance reconciliation */}
@@ -367,16 +452,34 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
                   <div className="font-serif text-xl text-stone-800">{fmtAUD(actualBalance)}</div>
                 </div>
                 <div className="text-right">
-                  <div className="text-[10px] text-stone-400 mb-0.5">
-                    {Math.abs(balanceDiff) < 0.5 ? 'Matches tracked' : (balanceDiff > 0 ? 'Tracked higher by' : 'Tracked lower by')}
-                  </div>
-                  <div className={`text-sm font-medium ${Math.abs(balanceDiff) < 0.5 ? 'text-olive' : 'text-ochre'}`}>
-                    {Math.abs(balanceDiff) < 0.5 ? '✓' : fmtAUD(Math.abs(balanceDiff))}
-                  </div>
+                  {untrackedSpend == null ? (
+                    <>
+                      <div className="text-[10px] text-stone-400 mb-0.5">Tracking check</div>
+                      <div className="text-[11px] font-medium text-sage">add cycle-start balance</div>
+                    </>
+                  ) : Math.abs(untrackedSpend) < 0.5 ? (
+                    <>
+                      <div className="text-[10px] text-stone-400 mb-0.5">Tracking</div>
+                      <div className="text-sm font-medium text-olive">✓ complete</div>
+                    </>
+                  ) : untrackedSpend > 0 ? (
+                    <>
+                      <div className="text-[10px] text-stone-400 mb-0.5">Untracked spend</div>
+                      <div className="text-sm font-medium text-ochre">{fmtAUD(untrackedSpend)}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="text-[10px] text-stone-400 mb-0.5">Tracked ahead by</div>
+                      <div className="text-sm font-medium text-stone-500">{fmtAUD(-untrackedSpend)}</div>
+                    </>
+                  )}
                 </div>
               </div>
               <div className="text-[10px] text-stone-300 mt-1.5">
-                {balanceAsOf ? 'Updated ' + fmtDate(balanceAsOf) : ''} &middot; tap to update
+                {expectedBalance != null
+                  ? `Start ${fmtAUD(startBalance)} + tracked ${fmtAUD(cycleAmex)} − paid ${fmtAUD(cyclePayments)} = ${fmtAUD(expectedBalance)} expected`
+                  : 'Add what was owed at cycle start so this shows untracked spend'}
+                {balanceAsOf ? ' · updated ' + fmtDate(balanceAsOf) : ''} · tap to update
               </div>
             </button>
           ) : (
@@ -415,7 +518,8 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
 
       <ReconcileModal
         open={reconcileOpen}
-        current={actualBalance}
+        settings={settings}
+        cycle={cycle}
         trackedSpend={cycleAmex}
         onSave={onUpdateSettings}
         onClose={() => setReconcileOpen(false)}
