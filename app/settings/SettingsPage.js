@@ -209,9 +209,9 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
       <div className="mb-5">
         <div className="px-4 mb-2 text-[10px] font-medium uppercase tracking-wider text-stone-400">Pay & commitments</div>
         <div className="bg-surface border-t border-b border-black/[0.07]">
-          <div className="px-4 pt-3 pb-1 text-[11px] font-medium text-stone-500">Matt &middot; fortnightly</div>
+          <div className="px-4 pt-3 pb-1 text-[11px] font-medium text-stone-500">Pay &middot; fortnightly</div>
           <SettingsRow
-            label="Pay date"
+            label="Matt's pay date"
             sub="A known pay day (repeats fortnightly)"
             right={
               <input
@@ -222,14 +222,9 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
               />
             }
           />
-          <SettingsRow label="Pay" right={<MoneyInput value={settings.matt_pay ?? 2824.61} onCommit={v => updateSetting('matt_pay', v)} />} />
-          <SettingsRow label="Mortgage swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.matt_mortgage ?? 1160} onCommit={v => updateSetting('matt_mortgage', v)} />} />
-          <SettingsRow label="Bills swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.matt_bills ?? 650} onCommit={v => updateSetting('matt_bills', v)} />} />
-          <SettingsRow label="Savings swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.matt_savings ?? 300} onCommit={v => updateSetting('matt_savings', v)} />} />
-
-          <div className="px-4 pt-3 pb-1 text-[11px] font-medium text-stone-500 border-t border-black/[0.05]">Liz &middot; fortnightly</div>
+          <SettingsRow label="Matt's pay" right={<MoneyInput value={settings.matt_pay ?? 2824.61} onCommit={v => updateSetting('matt_pay', v)} />} />
           <SettingsRow
-            label="Pay date"
+            label="Liz's pay date"
             sub="A known pay day (repeats fortnightly)"
             right={
               <input
@@ -240,11 +235,46 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
               />
             }
           />
-          <SettingsRow label="Pay" right={<MoneyInput value={settings.liz_pay ?? 1600} onCommit={v => updateSetting('liz_pay', v)} />} />
-          <SettingsRow label="Mortgage swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.liz_mortgage ?? 580} onCommit={v => updateSetting('liz_mortgage', v)} />} />
-          <SettingsRow label="Bills swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.liz_bills ?? 320} onCommit={v => updateSetting('liz_bills', v)} />} />
-          <SettingsRow label="Savings swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.liz_savings ?? 0} onCommit={v => updateSetting('liz_savings', v)} />} />
+          <SettingsRow label="Liz's pay" right={<MoneyInput value={settings.liz_pay ?? 1600} onCommit={v => updateSetting('liz_pay', v)} />} />
 
+          <div className="px-4 pt-3 pb-1 text-[11px] font-medium text-stone-500 border-t border-black/[0.05]">Commitments out of CBA</div>
+          <SettingsRow
+            label="Mortgage"
+            sub="Paid weekly, not on the card"
+            right={
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium text-ochre">$</span>
+                <input
+                  type="number"
+                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-ochre/40 pb-0.5"
+                  defaultValue={settings.mortgage_weekly ?? 895}
+                  onBlur={e => updateSetting('mortgage_weekly', e.target.value)}
+                />
+                <span className="text-xs text-stone-400">/wk</span>
+              </div>
+            }
+          />
+          <SettingsRow
+            label="Mortgage day"
+            sub="Weekday it leaves CBA"
+            right={
+              <select
+                className="text-sm bg-transparent outline-none text-stone-600"
+                defaultValue={settings.mortgage_weekday ?? 4}
+                onChange={e => updateSetting('mortgage_weekday', e.target.value)}
+              >
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            }
+          />
+          <SettingsRow label="Bills swept" sub="per pay, into the Bills account" right={<MoneyInput value={settings.bills_per_pay ?? 100} onCommit={v => updateSetting('bills_per_pay', v)} />} />
+          <SettingsRow label="Savings swept" sub="per pay, into Savings (discretionary)" right={<MoneyInput value={settings.savings_per_pay ?? 0} onCommit={v => updateSetting('savings_per_pay', v)} />} />
           <SettingsRow
             label="Include savings sweep"
             sub="Savings is discretionary, count it against coverage"

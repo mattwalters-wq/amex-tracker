@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { format, addDays } from 'date-fns'
+import { format, addDays, startOfDay } from 'date-fns'
 import { Pencil } from 'lucide-react'
 import { BUCKETS } from '../../lib/constants'
 import {
   getCurrentCycle, filterByCycle,
   sumBucket, sumCard, calcPoints,
   fmtAUD, fmtDate, groupByDate,
-  fortnightlyOccurrences,
+  fortnightlyOccurrences, countWeekday,
 } from '../../lib/utils'
 import TxItem from '../../components/TxItem'
 import EditTxDrawer from '../../components/EditTxDrawer'
@@ -243,26 +243,26 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
     setAsideTimer.current = setTimeout(() => { onUpdateSettings({ cba_set_aside: n }) }, 600)
   }
 
-  // Forward-looking coverage: each payday between now and the due date adds the
-  // pay but also sweeps committed money out of CBA (mortgage, bills, and a
-  // discretionary savings amount), so only the net is available for the Amex.
-  // Window is from after today up to and including the due date.
+  // Forward-looking coverage to the due date. Pays land fortnightly; committed
+  // money also leaves CBA before the bill is due: the mortgage weekly, and bills
+  // and a discretionary savings amount swept per pay. Only the net is available
+  // for the Amex. Window is from after today up to and including the due date.
   const includeSavings = settings.include_savings_sweep !== false
   const mattPay = Number(settings.matt_pay ?? 2824.61)
   const lizPay = Number(settings.liz_pay ?? 1600)
 
   const mattPays = useMemo(() => fortnightlyOccurrences(settings.matt_pay_anchor || '2026-06-11', new Date(), due), [settings.matt_pay_anchor, due])
   const lizPays = useMemo(() => fortnightlyOccurrences(settings.liz_pay_anchor || '2026-06-18', new Date(), due), [settings.liz_pay_anchor, due])
-  const mattCount = mattPays.length
-  const lizCount = lizPays.length
-  const payCount = mattCount + lizCount
+  const payCount = mattPays.length + lizPays.length
 
-  const paysTotal = mattCount * mattPay + lizCount * lizPay
-  const mortgageTotal = mattCount * Number(settings.matt_mortgage ?? 1160) + lizCount * Number(settings.liz_mortgage ?? 580)
-  const billsTotal = mattCount * Number(settings.matt_bills ?? 650) + lizCount * Number(settings.liz_bills ?? 320)
-  const savingsTotal = includeSavings
-    ? mattCount * Number(settings.matt_savings ?? 300) + lizCount * Number(settings.liz_savings ?? 0)
-    : 0
+  const mortgageWeekly = Number(settings.mortgage_weekly ?? 895)
+  const mortgageWeekday = settings.mortgage_weekday != null ? Number(settings.mortgage_weekday) : 4
+  const mortgageCount = useMemo(() => countWeekday(mortgageWeekday, addDays(startOfDay(new Date()), 1), due), [mortgageWeekday, due])
+
+  const paysTotal = mattPays.length * mattPay + lizPays.length * lizPay
+  const mortgageTotal = mortgageCount * mortgageWeekly
+  const billsTotal = payCount * Number(settings.bills_per_pay ?? 100)
+  const savingsTotal = includeSavings ? payCount * Number(settings.savings_per_pay ?? 0) : 0
   const incomingNet = paysTotal - mortgageTotal - billsTotal - savingsTotal
   const projectedAvailable = setAside + incomingNet
   const coverage = projectedAvailable - projectedBill
@@ -429,7 +429,7 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
         </div>
       </div>
       <div style={{ marginTop: 8, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
-        {`+ ${payCount} ${payCount === 1 ? 'pay' : 'pays'} (${money(paysTotal)}), less mortgage (${money(mortgageTotal)}), less bills (${money(billsTotal)}), less savings (${money(savingsTotal)}) = projected ${money(projectedAvailable)} by ${dueLabel}`}
+        {`+ ${payCount} ${payCount === 1 ? 'pay' : 'pays'} (${money(paysTotal)}), less mortgage (${money(mortgageTotal)}), less bills (${money(billsTotal)})${includeSavings ? `, less savings (${money(savingsTotal)})` : ''} = projected ${money(projectedAvailable)} by ${dueLabel}`}
       </div>
       <div style={{ marginTop: 11, fontSize: 15, fontWeight: 600, color: covered ? C.sage : C.terra }}>
         {covered
