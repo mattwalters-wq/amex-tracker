@@ -1,13 +1,14 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { format, addDays } from 'date-fns'
+import { format, addDays, startOfDay } from 'date-fns'
 import { Pencil } from 'lucide-react'
 import { BUCKETS } from '../../lib/constants'
 import {
   getCurrentCycle, filterByCycle,
   sumBucket, sumCard, calcPoints,
   fmtAUD, fmtDate, groupByDate,
+  fortnightlyOccurrences, countWeekday,
 } from '../../lib/utils'
 import TxItem from '../../components/TxItem'
 import EditTxDrawer from '../../components/EditTxDrawer'
@@ -184,8 +185,6 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   // Caps
   const dailyCap = settings.daily_weekly || 605
   const splurgeCap = settings.splurge_weekly || 250
-  const billsCap = settings.bills_monthly || 1500
-  const wineCap = settings.wine_monthly || 250
 
   // Cycle bucket + card totals
   const cycleDaily = sumBucket(cycleTx, 'daily')
@@ -244,38 +243,45 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
     setAsideTimer.current = setTimeout(() => { onUpdateSettings({ cba_set_aside: n }) }, 600)
   }
 
-  const coverageDiff = setAside - projectedBill
-  const covered = coverageDiff >= -0.005
+  // Forward-looking coverage: pays land and the mortgage leaves CBA between now
+  // and the due date, so project the CBA balance to the due date rather than
+  // freezing on today. Window is from after today up to and including the due date.
+  const mattPay = Number(settings.matt_pay ?? 2824.61)
+  const lizPay = Number(settings.liz_pay ?? 1600)
+  const mortgageWeekly = Number(settings.mortgage_weekly ?? 895)
+  const mortgageWeekday = settings.mortgage_weekday != null ? Number(settings.mortgage_weekday) : 4
+
+  const mattPays = useMemo(() => fortnightlyOccurrences(settings.matt_pay_anchor || '2026-06-11', new Date(), due), [settings.matt_pay_anchor, due])
+  const lizPays = useMemo(() => fortnightlyOccurrences(settings.liz_pay_anchor || '2026-06-18', new Date(), due), [settings.liz_pay_anchor, due])
+  const payCount = mattPays.length + lizPays.length
+  const incomingPays = mattPays.length * mattPay + lizPays.length * lizPay
+  const mortgageCount = useMemo(() => countWeekday(mortgageWeekday, addDays(startOfDay(new Date()), 1), due), [mortgageWeekday, due])
+  const mortgageOut = mortgageCount * mortgageWeekly
+  const projectedAvailable = setAside + incomingPays - mortgageOut
+  const coverage = projectedAvailable - projectedBill
+  const covered = coverage >= -0.005
 
   // "Left to spend" shows the binding constraint, not just the budget. Every
   // day-to-day dollar goes on the Amex and grows the bill, so the real room is
-  // bounded by the coverage buffer (set-aside minus the projected bill) as well
-  // as the day-to-day budget remaining. With no set-aside entered, fall back to
-  // the budget alone.
-  const setAsideEntered = setAside > 0
-  const overSetAside = setAsideEntered && coverageDiff < 0
-  const coverageIsLimit = setAsideEntered && coverageDiff < budgetRemaining
-  const leftToSpend = !setAsideEntered
-    ? budgetRemaining
-    : Math.max(0, Math.min(budgetRemaining, coverageDiff))
+  // bounded by the projected coverage as well as the day-to-day budget remaining.
+  const overSetAside = projectedAvailable < projectedBill - 0.005
+  const coverageIsLimit = coverage < budgetRemaining
+  const leftToSpend = Math.max(0, Math.min(budgetRemaining, coverage))
   const leftCaption = overSetAside
-    ? `over your set-aside by ${money(-coverageDiff)}`
+    ? `over your set-aside by ${money(projectedBill - projectedAvailable)}`
     : coverageIsLimit
       ? "capped by what you've set aside"
       : 'day to day, rest of cycle'
   const leftCaptionColor = overSetAside ? C.terra : C.muted
 
-  // "Where it's going" — calm list of buckets.
-  const bucketRow = (name, color, drill, spent, budget) => {
-    const left = budget - spent
-    const over = left < -0.005
-    return { name, color, drill, amount: money(Math.abs(left)), word: over ? 'over' : 'left' }
-  }
+  // "Where it's going" — calm breakdown of the bill: what has been spent per
+  // bucket this cycle (not remaining budget). Savings shows what's been saved.
+  const spentRow = (name, color, drill, spent) => ({ name, color, drill, amount: money(spent), word: 'spent' })
   const buckets = [
-    bucketRow('Daily', C.sage, 'daily', cycleDaily, dailyBudget),
-    bucketRow('Splurge', C.terra, 'splurge', cycleSplurge, splurgeBudget),
-    bucketRow('Bills', C.gold, 'bill', cycleBills, billsCap),
-    bucketRow('Wine', C.wine, 'wine', cycleWine, wineCap),
+    spentRow('Daily', C.sage, 'daily', cycleDaily),
+    spentRow('Splurge', C.terra, 'splurge', cycleSplurge),
+    spentRow('Bills', C.gold, 'bill', cycleBills),
+    spentRow('Wine', C.wine, 'wine', cycleWine),
     { name: 'Savings', color: C.olive, drill: 'savings', amount: money(cycleSavings), word: 'saved' },
   ]
 
@@ -415,10 +421,13 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
           <div style={{ fontSize: 12, color: C.muted }}>by {dueLabel}</div>
         </div>
       </div>
+      <div style={{ marginTop: 8, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
+        {`+ ${payCount} ${payCount === 1 ? 'pay' : 'pays'} before ${dueLabel} (${money(incomingPays)}), - mortgage (${money(mortgageOut)}) = projected ${money(projectedAvailable)} by ${dueLabel}`}
+      </div>
       <div style={{ marginTop: 11, fontSize: 15, fontWeight: 600, color: covered ? C.sage : C.terra }}>
         {covered
-          ? `Covered, ${money(coverageDiff)} to spare`
-          : `Short ${money(-coverageDiff)} for the bill`}
+          ? `Covered, ${money(coverage)} to spare`
+          : `Short ${money(-coverage)} for the bill`}
       </div>
       <button
         onClick={() => setReconcileOpen(true)}

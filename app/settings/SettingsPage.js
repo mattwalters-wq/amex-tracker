@@ -58,6 +58,10 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
     await onUpdate({ [key]: Number(value) })
   }
 
+  const updateText = async (key, value) => {
+    await onUpdate({ [key]: value })
+  }
+
   const dailyMonthly = Math.round((settings.daily_weekly || 605) * 4.4)
   const splurgeMonthly = Math.round((settings.splurge_weekly || 250) * 4.4)
   const totalMonthly = dailyMonthly + splurgeMonthly + (settings.wine_monthly || 250) + (settings.bills_monthly || 1500)
@@ -173,6 +177,102 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
                 className="text-sm bg-transparent outline-none text-stone-600"
                 defaultValue={settings.pay_day || 4}
                 onChange={e => updateSetting('pay_day', e.target.value)}
+              >
+                <option value="0">Sunday</option>
+                <option value="1">Monday</option>
+                <option value="2">Tuesday</option>
+                <option value="3">Wednesday</option>
+                <option value="4">Thursday</option>
+                <option value="5">Friday</option>
+                <option value="6">Saturday</option>
+              </select>
+            }
+          />
+        </div>
+      </div>
+
+      {/* Pay & mortgage */}
+      <div className="mb-5">
+        <div className="px-4 mb-2 text-[10px] font-medium uppercase tracking-wider text-stone-400">Pay & mortgage</div>
+        <div className="bg-surface border-t border-b border-black/[0.07]">
+          <SettingsRow
+            label="Matt's pay"
+            sub="Fortnightly, from anchor date"
+            right={
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium text-sage">$</span>
+                <input
+                  type="number"
+                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-sage/40 pb-0.5"
+                  defaultValue={settings.matt_pay ?? 2824.61}
+                  onBlur={e => updateSetting('matt_pay', e.target.value)}
+                />
+              </div>
+            }
+          />
+          <SettingsRow
+            label="Matt's pay date"
+            sub="A known pay day (repeats fortnightly)"
+            right={
+              <input
+                type="date"
+                className="text-sm bg-transparent outline-none text-stone-600 border-b border-sage/40 pb-0.5"
+                defaultValue={settings.matt_pay_anchor || '2026-06-11'}
+                onBlur={e => updateText('matt_pay_anchor', e.target.value)}
+              />
+            }
+          />
+          <SettingsRow
+            label="Liz's pay"
+            sub="Fortnightly, from anchor date"
+            right={
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium text-sage">$</span>
+                <input
+                  type="number"
+                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-sage/40 pb-0.5"
+                  defaultValue={settings.liz_pay ?? 1600}
+                  onBlur={e => updateSetting('liz_pay', e.target.value)}
+                />
+              </div>
+            }
+          />
+          <SettingsRow
+            label="Liz's pay date"
+            sub="A known pay day (repeats fortnightly)"
+            right={
+              <input
+                type="date"
+                className="text-sm bg-transparent outline-none text-stone-600 border-b border-sage/40 pb-0.5"
+                defaultValue={settings.liz_pay_anchor || '2026-06-18'}
+                onBlur={e => updateText('liz_pay_anchor', e.target.value)}
+              />
+            }
+          />
+          <SettingsRow
+            label="Mortgage"
+            sub="Paid from CBA, not on the card"
+            right={
+              <div className="flex items-center gap-1">
+                <span className="text-sm font-medium text-ochre">$</span>
+                <input
+                  type="number"
+                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-ochre/40 pb-0.5"
+                  defaultValue={settings.mortgage_weekly ?? 895}
+                  onBlur={e => updateSetting('mortgage_weekly', e.target.value)}
+                />
+                <span className="text-xs text-stone-400">/wk</span>
+              </div>
+            }
+          />
+          <SettingsRow
+            label="Mortgage day"
+            sub="Weekday it leaves CBA"
+            right={
+              <select
+                className="text-sm bg-transparent outline-none text-stone-600"
+                defaultValue={settings.mortgage_weekday ?? 4}
+                onChange={e => updateSetting('mortgage_weekday', e.target.value)}
               >
                 <option value="0">Sunday</option>
                 <option value="1">Monday</option>
