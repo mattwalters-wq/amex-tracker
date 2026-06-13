@@ -245,9 +245,9 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
 
   // Forward-looking coverage to the due date. Pays land fortnightly; committed
   // money also leaves CBA before the bill is due: the mortgage weekly, and bills
-  // and a discretionary savings amount swept per pay. Only the net is available
-  // for the Amex. Window is from after today up to and including the due date.
-  const includeSavings = settings.include_savings_sweep !== false
+  // plus other auto-debits (CommSec, subscriptions) swept per pay. Only the net
+  // is available for the Amex. Window is from after today up to and including
+  // the due date.
   const mattPay = Number(settings.matt_pay ?? 2824.61)
   const lizPay = Number(settings.liz_pay ?? 1600)
 
@@ -262,8 +262,8 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   const paysTotal = mattPays.length * mattPay + lizPays.length * lizPay
   const mortgageTotal = mortgageCount * mortgageWeekly
   const billsTotal = payCount * Number(settings.bills_per_pay ?? 100)
-  const savingsTotal = includeSavings ? payCount * Number(settings.savings_per_pay ?? 0) : 0
-  const incomingNet = paysTotal - mortgageTotal - billsTotal - savingsTotal
+  const otherTotal = payCount * Number(settings.other_per_pay ?? 100)
+  const incomingNet = paysTotal - mortgageTotal - billsTotal - otherTotal
   const projectedAvailable = setAside + incomingNet
   const coverage = projectedAvailable - projectedBill
   const covered = coverage >= -0.005
@@ -429,7 +429,7 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
         </div>
       </div>
       <div style={{ marginTop: 8, fontSize: 12, color: C.muted, lineHeight: 1.45 }}>
-        {`+ ${payCount} ${payCount === 1 ? 'pay' : 'pays'} (${money(paysTotal)}), less mortgage (${money(mortgageTotal)}), less bills (${money(billsTotal)})${includeSavings ? `, less savings (${money(savingsTotal)})` : ''} = projected ${money(projectedAvailable)} by ${dueLabel}`}
+        {`+ ${payCount} ${payCount === 1 ? 'pay' : 'pays'} (${money(paysTotal)}), less mortgage (${money(mortgageTotal)}), less bills (${money(billsTotal)}), less other (${money(otherTotal)}) = projected ${money(projectedAvailable)} by ${dueLabel}`}
       </div>
       <div style={{ marginTop: 11, fontSize: 15, fontWeight: 600, color: covered ? C.sage : C.terra }}>
         {covered

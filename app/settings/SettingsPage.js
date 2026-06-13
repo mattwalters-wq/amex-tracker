@@ -274,17 +274,7 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
             }
           />
           <SettingsRow label="Bills swept" sub="per pay, into the Bills account" right={<MoneyInput value={settings.bills_per_pay ?? 100} onCommit={v => updateSetting('bills_per_pay', v)} />} />
-          <SettingsRow label="Savings swept" sub="per pay, into Savings (discretionary)" right={<MoneyInput value={settings.savings_per_pay ?? 0} onCommit={v => updateSetting('savings_per_pay', v)} />} />
-          <SettingsRow
-            label="Include savings sweep"
-            sub="Savings is discretionary, count it against coverage"
-            right={
-              <Toggle
-                on={settings.include_savings_sweep !== false}
-                onToggle={() => updateText('include_savings_sweep', !(settings.include_savings_sweep !== false))}
-              />
-            }
-          />
+          <SettingsRow label="Other auto-debits per pay" sub="CommSec, subscriptions etc" right={<MoneyInput value={settings.other_per_pay ?? 100} onCommit={v => updateSetting('other_per_pay', v)} />} />
         </div>
       </div>
 
