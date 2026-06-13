@@ -1,16 +1,43 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { BUCKETS, AMEX } from '../../lib/constants'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { format, addDays } from 'date-fns'
+import { Pencil } from 'lucide-react'
+import { BUCKETS } from '../../lib/constants'
 import {
-  getCurrentCycle, getCurrentWeek, filterByCycle, filterByWeek,
-  sumBucket, sumCard, sumLiving, calcCarryForward, calcPoints,
+  getCurrentCycle, filterByCycle,
+  sumBucket, sumCard, calcPoints,
   fmtAUD, fmtDate, groupByDate,
 } from '../../lib/utils'
-import ProgressBar from '../../components/ProgressBar'
 import TxItem from '../../components/TxItem'
 import EditTxDrawer from '../../components/EditTxDrawer'
+
+// Home-screen design tokens (from the redesign handoff). Kept local so the rest
+// of the app's palette is untouched.
+const C = {
+  screen: '#F5F0E6',
+  ink: '#2B2724',
+  muted: '#8A8275',
+  faint: '#A39A88',
+  faint2: '#9A9180',
+  pencil: '#B3AA98',
+  sage: '#5E7E58',
+  terra: '#BE6A4C',
+  gold: '#A6802F',
+  wine: '#7A4A63',
+  olive: '#9CA77E',
+  hairline: 'rgba(43,39,36,0.12)',
+  hairlineFaint: 'rgba(43,39,36,0.08)',
+  dash: 'rgba(43,39,36,0.32)',
+}
+
+// Always show cents, with a leading minus outside the dollar sign.
+const money = (n) => {
+  const v = Number(n) || 0
+  const s = Math.abs(v).toLocaleString('en-AU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return (v < 0 ? '-$' : '$') + s
+}
+const money0 = (n) => '$' + (Number(n) || 0).toLocaleString('en-AU', { maximumFractionDigits: 0 })
 
 function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }) {
   const [balance, setBalance] = useState('')
@@ -56,15 +83,16 @@ function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/30" onClick={onClose}>
       <div
-        className="bg-cream w-full max-w-app rounded-t-3xl sm:rounded-3xl p-5 pb-8"
+        className="w-full max-w-app rounded-t-3xl sm:rounded-3xl p-5 pb-8"
+        style={{ background: C.screen }}
         onClick={e => e.stopPropagation()}
       >
-        <h2 className="font-serif text-2xl mb-1">Reconcile Amex balance</h2>
+        <h2 className="font-serif text-2xl mb-1">Amex posted balance</h2>
         <p className="text-xs text-stone-400 mb-4">
-          From the Amex app: the Total Balance now, what was owed when this cycle started ({fmtDate(cycle.start)} — usually last statement's closing balance), and payments made since. Then the gap to tracked spend shows what's missing.
+          From the Amex app: the Total Balance now, what was owed when this cycle started ({fmtDate(cycle.start)} — usually last statement's closing balance), and payments made since. This sets the "posted so far" line; the gap to logged spend is pending.
         </p>
         <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1 px-1">Total balance now</div>
-        <div className="flex items-center gap-2 bg-surface border border-black/10 rounded-xl px-4 py-3 mb-3">
+        <div className="flex items-center gap-2 border border-black/10 rounded-xl px-4 py-3 mb-3" style={{ background: '#FDFCFA' }}>
           <span className="font-serif text-2xl text-stone-400">$</span>
           <input
             type="number"
@@ -79,7 +107,7 @@ function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }
         <div className="grid grid-cols-2 gap-2 mb-3">
           <div>
             <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1 px-1">Owed at cycle start</div>
-            <div className="flex items-center gap-1.5 bg-surface border border-black/10 rounded-xl px-3 py-2.5">
+            <div className="flex items-center gap-1.5 border border-black/10 rounded-xl px-3 py-2.5" style={{ background: '#FDFCFA' }}>
               <span className="font-serif text-lg text-stone-400">$</span>
               <input
                 type="number"
@@ -93,7 +121,7 @@ function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }
           </div>
           <div>
             <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-1 px-1">Paid this cycle</div>
-            <div className="flex items-center gap-1.5 bg-surface border border-black/10 rounded-xl px-3 py-2.5">
+            <div className="flex items-center gap-1.5 border border-black/10 rounded-xl px-3 py-2.5" style={{ background: '#FDFCFA' }}>
               <span className="font-serif text-lg text-stone-400">$</span>
               <input
                 type="number"
@@ -106,24 +134,24 @@ function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }
             </div>
           </div>
         </div>
-        <div className="bg-surface border border-black/10 rounded-xl px-4 py-3 mb-5 text-xs">
+        <div className="border border-black/10 rounded-xl px-4 py-3 mb-5 text-xs" style={{ background: '#FDFCFA' }}>
           <div className="flex justify-between text-stone-400">
-            <span>Tracked this cycle</span>
+            <span>Logged this cycle</span>
             <span className="font-medium text-stone-600">{fmtAUD(trackedSpend)}</span>
           </div>
           {expected != null && (
             <div className="flex justify-between text-stone-400 mt-1">
-              <span>Expected balance (start + tracked − paid)</span>
+              <span>Posted so far (start + logged − paid)</span>
               <span className="font-medium text-stone-600">{fmtAUD(expected)}</span>
             </div>
           )}
           {untracked != null && (
             <div className="mt-1.5 pt-1.5 border-t border-black/[0.06] font-medium">
               {Math.abs(untracked) < 0.5
-                ? <span className="text-olive">✓ Matches the card — tracking is complete</span>
+                ? <span className="text-olive">✓ Posted has caught up to logged spend</span>
                 : untracked > 0
-                  ? <span className="text-ochre">{fmtAUD(untracked)} on the card isn't tracked yet</span>
-                  : <span className="text-stone-500">Tracked {fmtAUD(-untracked)} ahead of the card (refunds, pending or duplicates)</span>}
+                  ? <span className="text-ochre">{fmtAUD(untracked)} posted but not logged yet</span>
+                  : <span className="text-stone-500">{fmtAUD(-untracked)} logged still pending on the card</span>}
             </div>
           )}
         </div>
@@ -134,7 +162,8 @@ function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }
           <button
             onClick={handleSave}
             disabled={!valid || saving}
-            className="flex-1 py-3 rounded-xl text-sm font-medium bg-sage text-white disabled:bg-stone-200 disabled:text-stone-400"
+            className="flex-1 py-3 rounded-xl text-sm font-medium text-white disabled:bg-stone-200 disabled:text-stone-400"
+            style={!valid || saving ? undefined : { background: C.sage }}
           >
             {saving ? 'Saving...' : 'Save balance'}
           </button>
@@ -145,88 +174,106 @@ function ReconcileModal({ open, settings, cycle, trackedSpend, onSave, onClose }
 }
 
 export default function Dashboard({ transactions, settings, onDelete, onUpdate, onUpdateSettings }) {
-  const router = useRouter()
   const [editTx, setEditTx] = useState(null)
   const [drillBucket, setDrillBucket] = useState(null)
   const [reconcileOpen, setReconcileOpen] = useState(false)
 
   const cycle = useMemo(() => getCurrentCycle(settings.cycle_start_day || 22), [settings])
-  const week = useMemo(() => getCurrentWeek(settings.pay_day || 4), [settings])
-
   const cycleTx = useMemo(() => filterByCycle(transactions, settings.cycle_start_day || 22), [transactions, settings])
-  const weekTx = useMemo(() => filterByWeek(transactions, settings.pay_day || 4), [transactions, settings])
 
-  // Budget figures
+  // Caps
   const dailyCap = settings.daily_weekly || 605
   const splurgeCap = settings.splurge_weekly || 250
   const billsCap = settings.bills_monthly || 1500
   const wineCap = settings.wine_monthly || 250
 
-  const dailyCarry = useMemo(() => calcCarryForward(transactions, 'daily', dailyCap, settings.pay_day || 4), [transactions, dailyCap, settings])
-  const splurgeCarry = useMemo(() => calcCarryForward(transactions, 'splurge', splurgeCap, settings.pay_day || 4), [transactions, splurgeCap, settings])
-
-  // Cycle totals
-  const cycleLiving = sumLiving(cycleTx)
-  const cycleLivingBudget = (dailyCap * 4.4 + splurgeCap * 4.4)
+  // Cycle bucket + card totals
+  const cycleDaily = sumBucket(cycleTx, 'daily')
+  const cycleSplurge = sumBucket(cycleTx, 'splurge')
   const cycleBills = sumBucket(cycleTx, 'bill')
   const cycleWine = sumBucket(cycleTx, 'wine')
   const cycleSavings = sumBucket(cycleTx, 'savings')
   const cycleAmex = sumCard(cycleTx, 'amex')
-  const cycleDebit = sumCard(cycleTx, 'debit')
-
-  // Week totals
-  const weekDaily = sumBucket(weekTx, 'daily')
-  const weekSplurge = sumBucket(weekTx, 'splurge')
-
-  // Points
   const cyclePoints = calcPoints(cycleTx)
-  const totalPoints = calcPoints(transactions)
 
-  // Recovery calc
-  const livingOver = cycleLiving > cycleLivingBudget
-  const overspend = livingOver ? cycleLiving - cycleLivingBudget : 0
-  const recoveryPerDay = cycle.daysLeft > 0 ? overspend / cycle.daysLeft : 0
+  // Day-to-day budget for the cycle (Daily + Splurge caps scaled to cycle length)
+  const weeksInCycle = cycle.totalDays / 7
+  const dailyBudget = dailyCap * weeksInCycle
+  const splurgeBudget = splurgeCap * weeksInCycle
+  const livingBudget = dailyBudget + splurgeBudget
+  const leftToSpend = livingBudget - (cycleDaily + cycleSplurge)
 
-  // Pace marker (how much should be spent given days elapsed)
-  const livingPace = (cycleLivingBudget / cycle.totalDays) * cycle.daysElapsed
+  // The bill = logged spend on the Amex this cycle. This leads (it is everything
+  // bought this cycle) and is the hero coverage number.
+  const projectedBill = cycleAmex
 
-  // Left-to-spend figures
-  const livingLeft = cycleLivingBudget - cycleLiving
-  const billsLeft = billsCap - cycleBills
-  const wineLeft = wineCap - cycleWine
-
-  // Safe-to-spend on Amex this cycle (so it can be paid off in full)
-  const amexTarget = settings.amex_cycle_target || 4000
-  const amexHeadroom = amexTarget - cycleAmex
-  // Always-on daily allowance: charging this much per remaining day lands the bill at cap.
-  // Underspend a day and tomorrow's number rises — the underspending mechanism.
-  const dailySafe = cycle.daysLeft > 0 ? amexHeadroom / cycle.daysLeft : amexHeadroom
-
-  // Amex balance reconciliation: actual = start + new charges - payments, so the
-  // tracking check is actual vs (start + tracked - payments). Snapshot/payments
-  // from a previous cycle are ignored.
+  // Posted balance from the Amex app lags; the difference is pending, not error.
   const actualBalance = settings.amex_actual_balance != null ? Number(settings.amex_actual_balance) : null
-  const balanceAsOf = settings.amex_balance_updated_at || null
   const sameCycle = settings.amex_cycle_key === cycle.key
   const startBalance = sameCycle && settings.amex_cycle_start_balance != null ? Number(settings.amex_cycle_start_balance) : null
   const cyclePayments = sameCycle ? Number(settings.amex_payments_cycle || 0) : 0
-  const expectedBalance = startBalance != null ? startBalance + cycleAmex - cyclePayments : null
-  const untrackedSpend = actualBalance != null && expectedBalance != null ? actualBalance - expectedBalance : null
+  // Charges that have posted this cycle = balance now − owed at start + payments made.
+  const posted = (actualBalance != null && startBalance != null) ? actualBalance - startBalance + cyclePayments : null
+  const pending = posted != null ? projectedBill - posted : null
 
-  // Drill transactions
+  // Timeline: today -> cycle close -> payment due (~2 weeks of leeway after close).
+  const due = useMemo(() => addDays(cycle.end, 14), [cycle])
+  const daysToClose = cycle.daysLeft
+  const daysToDue = daysToClose + 14
+  const closePct = Math.max(0, Math.min(100, daysToDue > 0 ? (daysToClose / daysToDue) * 100 : 0))
+  const annotationPct = (closePct + 100) / 2
+  const weeksToPay = Math.max(1, Math.round((daysToDue - daysToClose) / 7))
+
+  // Editable CBA set-aside (persisted real user data).
+  const [setAside, setSetAside] = useState(settings.cba_set_aside ?? 4600)
+  const setAsideFocused = useRef(false)
+  const setAsideTimer = useRef(null)
+  useEffect(() => {
+    if (!setAsideFocused.current && settings.cba_set_aside != null) {
+      setSetAside(Number(settings.cba_set_aside))
+    }
+  }, [settings.cba_set_aside])
+
+  const handleSetAside = (raw) => {
+    const n = raw === '' ? 0 : Math.max(0, Math.round(Number(raw) || 0))
+    setSetAside(n)
+    clearTimeout(setAsideTimer.current)
+    setAsideTimer.current = setTimeout(() => { onUpdateSettings({ cba_set_aside: n }) }, 600)
+  }
+
+  const coverageDiff = setAside - projectedBill
+  const covered = coverageDiff >= -0.005
+
+  // "Where it's going" — calm list of buckets.
+  const bucketRow = (name, color, drill, spent, budget) => {
+    const left = budget - spent
+    const over = left < -0.005
+    return { name, color, drill, amount: money(Math.abs(left)), word: over ? 'over' : 'left' }
+  }
+  const buckets = [
+    bucketRow('Daily', C.sage, 'daily', cycleDaily, dailyBudget),
+    bucketRow('Splurge', C.terra, 'splurge', cycleSplurge, splurgeBudget),
+    bucketRow('Bills', C.gold, 'bill', cycleBills, billsCap),
+    bucketRow('Wine', C.wine, 'wine', cycleWine, wineCap),
+    { name: 'Savings', color: C.olive, drill: 'savings', amount: money(cycleSavings), word: 'saved' },
+  ]
+
+  const cycleLine = `${format(cycle.start, 'd MMM')} - ${format(cycle.end, 'd MMM')} · closes in ${cycle.daysLeft} ${cycle.daysLeft === 1 ? 'day' : 'days'}`
+  const dueLabel = format(due, 'd MMM')
+
+  // ---- Bucket drill-down (preserved) ----------------------------------------
   const drillTx = useMemo(() => {
     if (!drillBucket) return []
-    if (drillBucket === 'living') return cycleTx.filter(t => t.bucket === 'daily' || t.bucket === 'splurge')
     return cycleTx.filter(t => t.bucket === drillBucket)
   }, [drillBucket, cycleTx])
 
   if (drillBucket) {
-    const bucketLabel = drillBucket === 'living' ? 'Daily + Splurge' : BUCKETS[drillBucket]?.label || drillBucket
+    const bucketLabel = BUCKETS[drillBucket]?.label || drillBucket
     const grouped = groupByDate(drillTx)
     return (
-      <div className="pb-24">
-        <div className="sticky top-0 bg-cream z-10 px-4 pt-5 pb-3 flex items-center gap-3">
-          <button onClick={() => setDrillBucket(null)} className="text-sage p-1">
+      <div className="pb-28" style={{ background: C.screen, minHeight: '100vh' }}>
+        <div className="sticky top-0 z-10 px-4 pt-5 pb-3 flex items-center gap-3" style={{ background: C.screen }}>
+          <button onClick={() => setDrillBucket(null)} className="p-1" style={{ color: C.sage }}>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-5 h-5">
               <path d="M19 12H5M12 19l-7-7 7-7" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
@@ -251,268 +298,139 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
     )
   }
 
+  // ---- Home screen ----------------------------------------------------------
   return (
-    <div className="pb-24 px-4">
+    <div style={{ background: C.screen, minHeight: '100vh', padding: '66px 26px 110px' }}>
 
       {/* Header */}
-      <div className="pt-6 pb-4">
-        <p className="text-xs text-stone-400 font-medium uppercase tracking-wider">{cycle.label}</p>
-        <h1 className="font-serif text-3xl mt-0.5">Walters</h1>
-        <div className="mt-2">
-          <div className="flex justify-between text-xs text-stone-400 mb-1">
-            <span>{cycle.daysElapsed}d in</span>
-            <span>{cycle.daysLeft}d left</span>
-          </div>
-          <ProgressBar value={cycle.daysElapsed} max={cycle.totalDays} color="#7A9E8E" />
-        </div>
-      </div>
-
-      {/* Monthly Living Spend */}
-      <div
-        className="bg-surface border border-black/[0.07] rounded-2xl p-4 mb-3 cursor-pointer active:bg-cream-dark transition-colors"
-        onClick={() => setDrillBucket('living')}
-      >
-        <div className="flex justify-between items-start mb-2">
-          <span className="text-xs font-medium uppercase tracking-wider text-stone-400">Monthly living</span>
-          <span className="text-xs text-stone-400">Daily + Splurge</span>
-        </div>
-        <div className="flex items-end justify-between mb-2.5">
-          <div>
-            <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-0.5">Spent</div>
-            <div className={`font-serif text-3xl leading-none ${livingOver ? 'text-terra' : 'text-stone-800'}`}>{fmtAUD(cycleLiving)}</div>
-            <div className="text-[11px] text-stone-400 mt-1">of {fmtAUD(cycleLivingBudget)}</div>
-          </div>
-          <div className="text-right">
-            <div className="text-[10px] uppercase tracking-wider text-stone-400 mb-0.5">{livingOver ? 'Over by' : 'Left to spend'}</div>
-            <div className={`font-serif text-3xl leading-none ${livingOver ? 'text-terra' : 'text-olive'}`}>
-              {fmtAUD(Math.abs(livingLeft))}
-            </div>
-            <div className="text-[11px] text-stone-400 mt-1">{cycle.daysLeft}d left in cycle</div>
-          </div>
-        </div>
-        <ProgressBar value={cycleLiving} max={cycleLivingBudget} color="#7A9E8E" showPaceMarker paceValue={livingPace} />
-        {livingOver ? (
-          <div className="mt-2 text-xs text-terra font-medium">
-            {fmtAUD(recoveryPerDay)}/day to recover &middot; pace was {fmtAUD(livingPace)}
-          </div>
-        ) : (
-          <div className="mt-2 text-xs text-stone-400">
-            On pace you'd be at {fmtAUD(livingPace)} by now
-          </div>
-        )}
-      </div>
-
-      {/* Recovery card */}
-      {livingOver && (
-        <div className="bg-terra-light border border-terra/20 rounded-2xl p-4 mb-3">
-          <div className="text-xs font-medium uppercase tracking-wider text-terra mb-1">Recovery target</div>
-          <div className="flex gap-4">
-            <div>
-              <div className="font-serif text-2xl text-terra">{fmtAUD(recoveryPerDay)}</div>
-              <div className="text-xs text-stone-500">per day</div>
-            </div>
-            <div>
-              <div className="font-serif text-2xl text-terra">{fmtAUD(recoveryPerDay * 7)}</div>
-              <div className="text-xs text-stone-500">per week</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Weekly cards */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        {/* Daily */}
-        <div
-          className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
-          onClick={() => setDrillBucket('daily')}
-        >
-          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Daily this wk</div>
-          <div className={`font-serif text-2xl mb-1 ${weekDaily > dailyCarry.adjustedBudget ? 'text-terra' : 'text-stone-800'}`}>
-            {fmtAUD(weekDaily)}
-          </div>
-          <ProgressBar value={weekDaily} max={dailyCarry.adjustedBudget} color="#7A9E8E" />
-          <div className="text-[10px] mt-1.5">
-            {weekDaily > dailyCarry.adjustedBudget
-              ? <span className="text-terra font-medium">over by {fmtAUD(weekDaily - dailyCarry.adjustedBudget)}</span>
-              : <span className="text-stone-400"><span className="text-olive font-medium">{fmtAUD(dailyCarry.adjustedBudget - weekDaily)}</span> left of {fmtAUD(dailyCarry.adjustedBudget)}</span>}
-            {dailyCarry.carryNote && <span className="text-stone-300"> &middot; {dailyCarry.carryNote}</span>}
-          </div>
-        </div>
-
-        {/* Splurge */}
-        <div
-          className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
-          onClick={() => setDrillBucket('splurge')}
-        >
-          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Splurge this wk</div>
-          <div className={`font-serif text-2xl mb-1 ${weekSplurge > splurgeCarry.adjustedBudget ? 'text-terra' : 'text-stone-800'}`}>
-            {fmtAUD(weekSplurge)}
-          </div>
-          <ProgressBar value={weekSplurge} max={splurgeCarry.adjustedBudget} color="#C4705A" />
-          <div className="text-[10px] mt-1.5">
-            {weekSplurge > splurgeCarry.adjustedBudget
-              ? <span className="text-terra font-medium">over by {fmtAUD(weekSplurge - splurgeCarry.adjustedBudget)}</span>
-              : <span className="text-stone-400"><span className="text-olive font-medium">{fmtAUD(splurgeCarry.adjustedBudget - weekSplurge)}</span> left of {fmtAUD(splurgeCarry.adjustedBudget)}</span>}
-            {splurgeCarry.carryNote && <span className="text-stone-300"> &middot; {splurgeCarry.carryNote}</span>}
-          </div>
-        </div>
-      </div>
-
-      {/* Bills + Wine + Savings */}
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        <div
-          className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
-          onClick={() => setDrillBucket('bill')}
-        >
-          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Bills</div>
-          <div className={`font-serif text-xl mb-1 ${cycleBills > billsCap ? 'text-terra' : 'text-stone-800'}`}>{fmtAUD(cycleBills)}</div>
-          <ProgressBar value={cycleBills} max={billsCap} color="#C49A4A" />
-          <div className="text-[10px] mt-1.5">
-            {billsLeft < 0
-              ? <span className="text-terra font-medium">over by {fmtAUD(-billsLeft)}</span>
-              : <span className="text-stone-400"><span className="text-olive font-medium">{fmtAUD(billsLeft)}</span> left</span>}
-          </div>
-        </div>
-        <div
-          className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
-          onClick={() => setDrillBucket('wine')}
-        >
-          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Wine</div>
-          <div className={`font-serif text-xl mb-1 ${cycleWine > wineCap ? 'text-terra' : 'text-stone-800'}`} style={{ color: cycleWine > wineCap ? undefined : '#8E5A7A' }}>{fmtAUD(cycleWine)}</div>
-          <ProgressBar value={cycleWine} max={wineCap} color="#8E5A7A" />
-          <div className="text-[10px] mt-1.5">
-            {wineLeft < 0
-              ? <span className="text-terra font-medium">over by {fmtAUD(-wineLeft)}</span>
-              : <span className="text-stone-400"><span className="text-olive font-medium">{fmtAUD(wineLeft)}</span> left</span>}
-          </div>
-        </div>
-        <div
-          className="bg-surface border border-black/[0.07] rounded-2xl p-3.5 cursor-pointer active:bg-cream-dark"
-          onClick={() => setDrillBucket('savings')}
-        >
-          <div className="text-[10px] font-medium uppercase tracking-wider text-stone-400 mb-0.5">Savings</div>
-          <div className="font-serif text-xl mb-1 text-olive">{fmtAUD(cycleSavings)}</div>
-          <div className="text-[10px] text-stone-400 mt-1.5">no cap</div>
-        </div>
-      </div>
-
-      {/* Amex card */}
-      <div className="bg-surface border border-black/[0.07] rounded-2xl p-4 mb-3">
-        <div className="flex justify-between items-baseline mb-3">
-          <span className="text-xs font-medium uppercase tracking-wider text-stone-400">Amex this cycle</span>
-          <span className="text-[10px] text-stone-400">{cycle.daysLeft}d left &middot; ends {cycle.endLabel}</span>
-        </div>
-        <div className="flex justify-between items-center mb-3">
-          <div>
-            <div className="text-[10px] text-stone-400 mb-0.5">Spend</div>
-            <div className="font-serif text-xl text-stone-800">{fmtAUD(cycleAmex)}</div>
-          </div>
-          <div className="w-px h-8 bg-stone-200" />
-          <div>
-            <div className="text-[10px] text-stone-400 mb-0.5">Debit</div>
-            <div className="font-serif text-xl text-olive">{fmtAUD(cycleDebit)}</div>
-          </div>
-          <div className="w-px h-8 bg-stone-200" />
-          <div>
-            <div className="text-[10px] text-stone-400 mb-0.5">QF pts</div>
-            <div className="font-serif text-xl text-ochre">{cyclePoints.toLocaleString()}</div>
-          </div>
-        </div>
-
-        {/* Safe to spend this cycle (pay off in full) */}
-        <div className="border-t border-black/[0.06] pt-3 mb-3">
-          <div className="flex justify-between items-baseline mb-1.5">
-            <span className="text-[10px] uppercase tracking-wider text-stone-400">Safe to spend &middot; cap {fmtAUD(amexTarget)}</span>
-            {amexHeadroom >= 0
-              ? <span className="text-[11px]"><span className="text-olive font-medium">{fmtAUD(amexHeadroom)}</span> <span className="text-stone-400">left</span></span>
-              : <span className="text-[11px] text-terra font-medium">over by {fmtAUD(-amexHeadroom)}</span>}
-          </div>
-          <ProgressBar value={cycleAmex} max={amexTarget} color="#7A9E8E" />
-          {amexHeadroom >= 0 && cycle.daysLeft > 0 ? (
-            <div className="mt-2 flex items-baseline gap-1.5">
-              <span className="font-serif text-lg leading-none text-olive">{fmtAUD(dailySafe)}</span>
-              <span className="text-[10px] text-stone-400">/day on the card for the next {cycle.daysLeft}d lands the bill right at cap</span>
-            </div>
-          ) : amexHeadroom >= 0 ? (
-            <div className="text-[10px] text-stone-400 mt-1.5">Cycle closes today &middot; {fmtAUD(amexHeadroom)} headroom left</div>
-          ) : (
-            <div className="mt-2 text-[10px] text-terra font-medium">
-              Cap reached &middot; put the rest of the cycle on debit to hold the bill at {fmtAUD(cycleAmex)}
-            </div>
-          )}
-        </div>
-
-        {/* Actual balance reconciliation */}
-        <div className="border-t border-black/[0.06] pt-3 mb-3">
-          {actualBalance != null ? (
-            <button onClick={() => setReconcileOpen(true)} className="w-full text-left">
-              <div className="flex justify-between items-baseline">
-                <div>
-                  <div className="text-[10px] text-stone-400 mb-0.5">Actual card balance</div>
-                  <div className="font-serif text-xl text-stone-800">{fmtAUD(actualBalance)}</div>
-                </div>
-                <div className="text-right">
-                  {untrackedSpend == null ? (
-                    <>
-                      <div className="text-[10px] text-stone-400 mb-0.5">Tracking check</div>
-                      <div className="text-[11px] font-medium text-sage">add cycle-start balance</div>
-                    </>
-                  ) : Math.abs(untrackedSpend) < 0.5 ? (
-                    <>
-                      <div className="text-[10px] text-stone-400 mb-0.5">Tracking</div>
-                      <div className="text-sm font-medium text-olive">✓ complete</div>
-                    </>
-                  ) : untrackedSpend > 0 ? (
-                    <>
-                      <div className="text-[10px] text-stone-400 mb-0.5">Untracked spend</div>
-                      <div className="text-sm font-medium text-ochre">{fmtAUD(untrackedSpend)}</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="text-[10px] text-stone-400 mb-0.5">Tracked ahead by</div>
-                      <div className="text-sm font-medium text-stone-500">{fmtAUD(-untrackedSpend)}</div>
-                    </>
-                  )}
-                </div>
-              </div>
-              <div className="text-[10px] text-stone-300 mt-1.5">
-                {expectedBalance != null
-                  ? `Start ${fmtAUD(startBalance)} + tracked ${fmtAUD(cycleAmex)} − paid ${fmtAUD(cyclePayments)} = ${fmtAUD(expectedBalance)} expected`
-                  : 'Add what was owed at cycle start so this shows untracked spend'}
-                {balanceAsOf ? ' · updated ' + fmtDate(balanceAsOf) : ''} · tap to update
-              </div>
-            </button>
-          ) : (
-            <button
-              onClick={() => setReconcileOpen(true)}
-              className="w-full flex items-center justify-center gap-1.5 text-xs font-medium text-sage py-1.5 border border-sage/30 rounded-lg active:bg-cream-dark"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="w-3.5 h-3.5">
-                <path d="M12 5v14M5 12h14" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Enter actual Amex balance
-            </button>
-          )}
-        </div>
-
-        {/* Sign-up bonus progress */}
+      <div className="flex justify-between items-start">
         <div>
-          <div className="flex justify-between text-[10px] text-stone-400 mb-1">
-            <span>Signup bonus spend</span>
-            <span className="text-olive font-medium">Achieved! 74,096 pts</span>
-          </div>
-          <ProgressBar value={AMEX.signupBonusTarget} max={AMEX.signupBonusTarget} color="#5E6B4A" />
+          <div className="font-serif" style={{ fontSize: 26, color: C.ink, lineHeight: 1.05 }}>Walters</div>
+          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 5 }}>{cycleLine}</div>
+        </div>
+        <div className="flex-shrink-0 text-right" style={{ paddingTop: 2 }}>
+          <div style={{ fontSize: 15, color: C.ink, fontWeight: 600 }}>{cyclePoints.toLocaleString()}</div>
+          <div style={{ fontSize: 10.5, color: C.faint, letterSpacing: '0.3px' }}>Qantas pts</div>
         </div>
       </div>
 
-      {/* Recent transactions */}
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="font-serif text-xl">Recent</h2>
-        <button onClick={() => router.push('/transactions')} className="text-xs text-sage font-medium">See all</button>
+      {/* Hero one: left to spend */}
+      <div style={{ marginTop: 34 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, letterSpacing: '0.2px' }}>Left to spend</div>
+        <div className="font-serif" style={{ fontSize: 62, lineHeight: 1, color: C.ink, marginTop: 8 }}>{money(leftToSpend)}</div>
+        <div className="flex items-baseline justify-between" style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 14, color: C.muted }}>day to day, rest of cycle</div>
+          <div style={{ fontSize: 13, color: C.faint }}>of {money0(livingBudget)}</div>
+        </div>
       </div>
-      {transactions.slice(0, 8).map(tx => (
-        <TxItem key={tx.id} tx={tx} onDelete={onDelete} onEdit={setEditTx} showDate />
+
+      <div style={{ height: 1, background: C.hairline, margin: '26px 0' }} />
+
+      {/* Hero two: the bill / coverage */}
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, letterSpacing: '0.2px' }}>The bill</div>
+      <div className="flex items-baseline flex-wrap" style={{ gap: 11, marginTop: 7 }}>
+        <div className="font-serif" style={{ fontSize: 46, lineHeight: 1, color: C.ink }}>{money(projectedBill)}</div>
+        <div style={{ fontSize: 12.5, color: C.muted }}>projected, logged this cycle</div>
+      </div>
+
+      {/* Timeline */}
+      <div style={{ margin: '22px 2px 0' }}>
+        {/* leeway annotation over the sage segment */}
+        <div style={{ position: 'relative', height: 19 }}>
+          <div
+            className="font-serif italic"
+            style={{ position: 'absolute', left: annotationPct + '%', bottom: 0, transform: 'translateX(-50%)', fontSize: 15, color: C.sage, whiteSpace: 'nowrap', lineHeight: 1 }}
+          >
+            {weeksToPay === 1 ? '1 week to pay' : `${weeksToPay} weeks to pay`}
+          </div>
+        </div>
+        {/* track */}
+        <div style={{ position: 'relative', height: 10 }}>
+          <div style={{ position: 'absolute', top: 4, left: 5, right: 5, height: 2, background: C.hairline, borderRadius: 2 }} />
+          <div style={{ position: 'absolute', top: 4, left: closePct + '%', right: 5, height: 2, background: C.sage, borderRadius: 2 }} />
+          <div style={{ position: 'absolute', top: 0, left: 5, transform: 'translateX(-50%)', width: 10, height: 10, borderRadius: '50%', background: C.ink }} />
+          <div style={{ position: 'absolute', top: 0, left: closePct + '%', transform: 'translateX(-50%)', width: 10, height: 10, borderRadius: '50%', background: C.screen, border: `2px solid ${C.muted}` }} />
+          <div style={{ position: 'absolute', top: 0, right: 5, transform: 'translateX(50%)', width: 10, height: 10, borderRadius: '50%', background: C.sage }} />
+        </div>
+        {/* labels */}
+        <div style={{ position: 'relative', height: 33, marginTop: 9 }}>
+          <div style={{ position: 'absolute', left: 0, top: 0, textAlign: 'left' }}>
+            <div style={{ fontSize: 11.5, color: C.ink, fontWeight: 600 }}>Today</div>
+            <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>{format(new Date(), 'd MMM')}</div>
+          </div>
+          <div style={{ position: 'absolute', left: closePct + '%', top: 0, transform: 'translateX(-50%)', textAlign: 'center' }}>
+            <div style={{ fontSize: 11.5, color: C.ink, fontWeight: 600 }}>Closes</div>
+            <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>{format(cycle.end, 'd MMM')}</div>
+          </div>
+          <div style={{ position: 'absolute', right: 0, top: 0, textAlign: 'right' }}>
+            <div style={{ fontSize: 11.5, color: C.ink, fontWeight: 600 }}>Due</div>
+            <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>{dueLabel}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Set aside / coverage */}
+      <div className="flex items-end justify-between" style={{ marginTop: 22 }}>
+        <div>
+          <div style={{ fontSize: 12.5, color: C.muted }}>Set aside in CBA</div>
+          <div className="flex items-baseline" style={{ gap: 1, marginTop: 5 }}>
+            <span className="font-serif" style={{ fontSize: 31, color: C.ink }}>$</span>
+            <input
+              type="number"
+              inputMode="numeric"
+              className="no-spinner font-serif"
+              value={setAside}
+              onFocus={() => { setAsideFocused.current = true }}
+              onBlur={() => { setAsideFocused.current = false }}
+              onChange={e => handleSetAside(e.target.value)}
+              style={{ fontSize: 31, color: C.ink, border: 'none', background: 'transparent', width: 104, padding: '0 2px', outline: 'none', borderBottom: `1px dashed ${C.dash}`, lineHeight: 1 }}
+            />
+            <Pencil style={{ width: 15, height: 15, color: C.pencil, marginLeft: 5 }} strokeWidth={1.75} />
+          </div>
+        </div>
+        <div className="text-right" style={{ paddingBottom: 5 }}>
+          <div style={{ fontSize: 12, color: C.muted }}>by {dueLabel}</div>
+        </div>
+      </div>
+      <div style={{ marginTop: 11, fontSize: 15, fontWeight: 600, color: covered ? C.sage : C.terra }}>
+        {covered
+          ? `Covered, ${money(coverageDiff)} to spare`
+          : `Short ${money(-coverageDiff)} for the bill`}
+      </div>
+      <button
+        onClick={() => setReconcileOpen(true)}
+        className="block text-left"
+        style={{ marginTop: 9, fontSize: 12.5, color: C.faint }}
+      >
+        {posted != null
+          ? `posted so far ${money(posted)}${pending >= 0.005 ? ` · ${money(pending)} pending` : ''}`
+          : 'add your Amex balance to see what’s posted'}
+      </button>
+
+      <div style={{ height: 1, background: C.hairline, margin: '26px 0 6px' }} />
+
+      {/* Where it's going */}
+      <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, letterSpacing: '0.2px', marginBottom: 2 }}>Where it&apos;s going</div>
+      {buckets.map((b) => (
+        <button
+          key={b.name}
+          onClick={() => setDrillBucket(b.drill)}
+          className="w-full flex items-center text-left"
+          style={{ padding: '13px 0', borderBottom: `1px solid ${C.hairlineFaint}` }}
+        >
+          <div style={{ width: 8, height: 8, borderRadius: '50%', background: b.color, marginRight: 14, flexShrink: 0 }} />
+          <div style={{ flex: 1, fontSize: 16, color: C.ink }}>{b.name}</div>
+          <div className="flex items-baseline" style={{ gap: 6 }}>
+            <span style={{ fontSize: 16, color: C.ink }}>{b.amount}</span>
+            <span style={{ fontSize: 12, color: C.faint2, minWidth: 30 }}>{b.word}</span>
+          </div>
+        </button>
       ))}
+
+      {/* Footer */}
+      <div style={{ marginTop: 20, fontSize: 12, color: C.faint, lineHeight: 1.55 }}>
+        Pace, weekly comparisons and the tracking check live in Reports.
+      </div>
 
       <EditTxDrawer tx={editTx} onSave={onUpdate} onDelete={onDelete} onClose={() => setEditTx(null)} />
 
