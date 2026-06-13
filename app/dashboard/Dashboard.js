@@ -201,7 +201,7 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   const dailyBudget = dailyCap * weeksInCycle
   const splurgeBudget = splurgeCap * weeksInCycle
   const livingBudget = dailyBudget + splurgeBudget
-  const leftToSpend = livingBudget - (cycleDaily + cycleSplurge)
+  const budgetRemaining = livingBudget - (cycleDaily + cycleSplurge)
 
   // The bill = logged spend on the Amex this cycle. This leads (it is everything
   // bought this cycle) and is the hero coverage number.
@@ -246,6 +246,24 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
 
   const coverageDiff = setAside - projectedBill
   const covered = coverageDiff >= -0.005
+
+  // "Left to spend" shows the binding constraint, not just the budget. Every
+  // day-to-day dollar goes on the Amex and grows the bill, so the real room is
+  // bounded by the coverage buffer (set-aside minus the projected bill) as well
+  // as the day-to-day budget remaining. With no set-aside entered, fall back to
+  // the budget alone.
+  const setAsideEntered = setAside > 0
+  const overSetAside = setAsideEntered && coverageDiff < 0
+  const coverageIsLimit = setAsideEntered && coverageDiff < budgetRemaining
+  const leftToSpend = !setAsideEntered
+    ? budgetRemaining
+    : Math.max(0, Math.min(budgetRemaining, coverageDiff))
+  const leftCaption = overSetAside
+    ? `over your set-aside by ${money(-coverageDiff)}`
+    : coverageIsLimit
+      ? "capped by what you've set aside"
+      : 'day to day, rest of cycle'
+  const leftCaptionColor = overSetAside ? C.terra : C.muted
 
   // "Where it's going" — calm list of buckets.
   const bucketRow = (name, color, drill, spent, budget) => {
@@ -322,7 +340,7 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
         <div style={{ fontSize: 13, fontWeight: 600, color: C.muted, letterSpacing: '0.2px' }}>Left to spend</div>
         <div className="font-serif" style={{ fontSize: 62, lineHeight: 1, color: C.ink, marginTop: 8 }}>{money(leftToSpend)}</div>
         <div className="flex items-baseline justify-between" style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 14, color: C.muted }}>day to day, rest of cycle</div>
+          <div style={{ fontSize: 14, color: leftCaptionColor }}>{leftCaption}</div>
           <div style={{ fontSize: 13, color: C.faint }}>of {money0(livingBudget)}</div>
         </div>
       </div>
