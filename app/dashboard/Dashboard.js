@@ -235,7 +235,10 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   }, [settings.cba_set_aside])
 
   const handleSetAside = (raw) => {
-    const n = raw === '' ? 0 : Math.max(0, Math.round(Number(raw) || 0))
+    // Keep digits only -> non-negative integer. Avoids the controlled
+    // number-input leading-zero quirk (e.g. "0" + "1889" = "01889").
+    const digits = String(raw).replace(/[^0-9]/g, '')
+    const n = digits === '' ? 0 : parseInt(digits, 10)
     setSetAside(n)
     clearTimeout(setAsideTimer.current)
     setAsideTimer.current = setTimeout(() => { onUpdateSettings({ cba_set_aside: n }) }, 600)
@@ -376,10 +379,12 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
           <div className="flex items-baseline" style={{ gap: 1, marginTop: 5 }}>
             <span className="font-serif" style={{ fontSize: 31, color: C.ink }}>$</span>
             <input
-              type="number"
+              type="text"
               inputMode="numeric"
+              pattern="[0-9]*"
+              placeholder="0"
               className="no-spinner font-serif"
-              value={setAside}
+              value={setAside === 0 ? '' : String(setAside)}
               onFocus={() => { setAsideFocused.current = true }}
               onBlur={() => { setAsideFocused.current = false }}
               onChange={e => handleSetAside(e.target.value)}
