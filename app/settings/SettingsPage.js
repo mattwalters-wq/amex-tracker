@@ -15,6 +15,20 @@ function Toggle({ on, onToggle }) {
   )
 }
 
+function MoneyInput({ value, onCommit }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-sm font-medium text-sage">$</span>
+      <input
+        type="number"
+        className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-sage/40 pb-0.5"
+        defaultValue={value}
+        onBlur={e => onCommit(e.target.value)}
+      />
+    </div>
+  )
+}
+
 function SettingsRow({ label, sub, right }) {
   return (
     <div className="flex items-center px-4 py-3.5 border-b border-black/[0.05] last:border-0 gap-3">
@@ -191,27 +205,13 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
         </div>
       </div>
 
-      {/* Pay & mortgage */}
+      {/* Pay & commitments */}
       <div className="mb-5">
-        <div className="px-4 mb-2 text-[10px] font-medium uppercase tracking-wider text-stone-400">Pay & mortgage</div>
+        <div className="px-4 mb-2 text-[10px] font-medium uppercase tracking-wider text-stone-400">Pay & commitments</div>
         <div className="bg-surface border-t border-b border-black/[0.07]">
+          <div className="px-4 pt-3 pb-1 text-[11px] font-medium text-stone-500">Matt &middot; fortnightly</div>
           <SettingsRow
-            label="Matt's pay"
-            sub="Fortnightly, from anchor date"
-            right={
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-medium text-sage">$</span>
-                <input
-                  type="number"
-                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-sage/40 pb-0.5"
-                  defaultValue={settings.matt_pay ?? 2824.61}
-                  onBlur={e => updateSetting('matt_pay', e.target.value)}
-                />
-              </div>
-            }
-          />
-          <SettingsRow
-            label="Matt's pay date"
+            label="Pay date"
             sub="A known pay day (repeats fortnightly)"
             right={
               <input
@@ -222,23 +222,14 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
               />
             }
           />
+          <SettingsRow label="Pay" right={<MoneyInput value={settings.matt_pay ?? 2824.61} onCommit={v => updateSetting('matt_pay', v)} />} />
+          <SettingsRow label="Mortgage swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.matt_mortgage ?? 1160} onCommit={v => updateSetting('matt_mortgage', v)} />} />
+          <SettingsRow label="Bills swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.matt_bills ?? 650} onCommit={v => updateSetting('matt_bills', v)} />} />
+          <SettingsRow label="Savings swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.matt_savings ?? 300} onCommit={v => updateSetting('matt_savings', v)} />} />
+
+          <div className="px-4 pt-3 pb-1 text-[11px] font-medium text-stone-500 border-t border-black/[0.05]">Liz &middot; fortnightly</div>
           <SettingsRow
-            label="Liz's pay"
-            sub="Fortnightly, from anchor date"
-            right={
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-medium text-sage">$</span>
-                <input
-                  type="number"
-                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-sage/40 pb-0.5"
-                  defaultValue={settings.liz_pay ?? 1600}
-                  onBlur={e => updateSetting('liz_pay', e.target.value)}
-                />
-              </div>
-            }
-          />
-          <SettingsRow
-            label="Liz's pay date"
+            label="Pay date"
             sub="A known pay day (repeats fortnightly)"
             right={
               <input
@@ -249,39 +240,19 @@ export default function SettingsPage({ settings, onUpdate, onLock }) {
               />
             }
           />
+          <SettingsRow label="Pay" right={<MoneyInput value={settings.liz_pay ?? 1600} onCommit={v => updateSetting('liz_pay', v)} />} />
+          <SettingsRow label="Mortgage swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.liz_mortgage ?? 580} onCommit={v => updateSetting('liz_mortgage', v)} />} />
+          <SettingsRow label="Bills swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.liz_bills ?? 320} onCommit={v => updateSetting('liz_bills', v)} />} />
+          <SettingsRow label="Savings swept" sub="per pay, out of CBA" right={<MoneyInput value={settings.liz_savings ?? 0} onCommit={v => updateSetting('liz_savings', v)} />} />
+
           <SettingsRow
-            label="Mortgage"
-            sub="Paid from CBA, not on the card"
+            label="Include savings sweep"
+            sub="Savings is discretionary, count it against coverage"
             right={
-              <div className="flex items-center gap-1">
-                <span className="text-sm font-medium text-ochre">$</span>
-                <input
-                  type="number"
-                  className="w-20 text-right text-sm font-medium bg-transparent outline-none border-b border-ochre/40 pb-0.5"
-                  defaultValue={settings.mortgage_weekly ?? 895}
-                  onBlur={e => updateSetting('mortgage_weekly', e.target.value)}
-                />
-                <span className="text-xs text-stone-400">/wk</span>
-              </div>
-            }
-          />
-          <SettingsRow
-            label="Mortgage day"
-            sub="Weekday it leaves CBA"
-            right={
-              <select
-                className="text-sm bg-transparent outline-none text-stone-600"
-                defaultValue={settings.mortgage_weekday ?? 4}
-                onChange={e => updateSetting('mortgage_weekday', e.target.value)}
-              >
-                <option value="0">Sunday</option>
-                <option value="1">Monday</option>
-                <option value="2">Tuesday</option>
-                <option value="3">Wednesday</option>
-                <option value="4">Thursday</option>
-                <option value="5">Friday</option>
-                <option value="6">Saturday</option>
-              </select>
+              <Toggle
+                on={settings.include_savings_sweep !== false}
+                onToggle={() => updateText('include_savings_sweep', !(settings.include_savings_sweep !== false))}
+              />
             }
           />
         </div>
