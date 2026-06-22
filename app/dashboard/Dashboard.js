@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useMemo, useEffect, useRef } from 'react'
-import { format, addDays, startOfDay } from 'date-fns'
-import { Pencil } from 'lucide-react'
+import { format, addDays, startOfDay, differenceInDays } from 'date-fns'
+import { Pencil, ChevronLeft, ChevronRight } from 'lucide-react'
 import { BUCKETS } from '../../lib/constants'
 import {
-  getCurrentCycle, filterByCycle,
+  getCurrentCycle, filterByDateRange,
   sumBucket, sumCard, calcPoints,
   fmtAUD, fmtDate, groupByDate,
   fortnightlyOccurrences, countWeekday,
@@ -178,9 +178,13 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   const [editTx, setEditTx] = useState(null)
   const [drillBucket, setDrillBucket] = useState(null)
   const [reconcileOpen, setReconcileOpen] = useState(false)
+  // 0 = current cycle, -1 = previous, etc. Lets you step back to a cycle that
+  // has closed but isn't paid yet (the bill is still due ~2 weeks after close).
+  const [cycleOffset, setCycleOffset] = useState(0)
 
-  const cycle = useMemo(() => getCurrentCycle(settings.cycle_start_day || 22), [settings])
-  const cycleTx = useMemo(() => filterByCycle(transactions, settings.cycle_start_day || 22), [transactions, settings])
+  const cycle = useMemo(() => getCurrentCycle(settings.cycle_start_day || 22, cycleOffset), [settings, cycleOffset])
+  const cycleTx = useMemo(() => filterByDateRange(transactions, cycle.start, cycle.end), [transactions, cycle])
+  const isCurrent = cycleOffset === 0
 
   // Caps
   const dailyCap = settings.daily_weekly || 605
@@ -216,9 +220,11 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   const pending = posted != null ? projectedBill - posted : null
 
   // Timeline: today -> cycle close -> payment due (~2 weeks of leeway after close).
-  const due = useMemo(() => addDays(cycle.end, 14), [cycle])
+  // For a cycle that has already closed, "close" sits at today (left) and the bar
+  // counts down to the due date, which is what's still ahead of you.
+  const due = useMemo(() => addDays(startOfDay(cycle.end), 14), [cycle])
   const daysToClose = cycle.daysLeft
-  const daysToDue = daysToClose + 14
+  const daysToDue = Math.max(daysToClose, differenceInDays(due, startOfDay(new Date())))
   const closePct = Math.max(0, Math.min(100, daysToDue > 0 ? (daysToClose / daysToDue) * 100 : 0))
   const annotationPct = (closePct + 100) / 2
   const weeksToPay = Math.max(1, Math.round((daysToDue - daysToClose) / 7))
@@ -278,7 +284,9 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
     ? `over your set-aside by ${money(projectedBill - projectedAvailable)}`
     : coverageIsLimit
       ? "capped by what you've set aside"
-      : 'day to day, rest of cycle'
+      : isCurrent
+        ? 'day to day, rest of cycle'
+        : 'this cycle has closed'
   const leftCaptionColor = overSetAside ? C.terra : C.muted
 
   // "Where it's going" — calm breakdown of the bill: what has been spent per
@@ -292,7 +300,13 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
     { name: 'Savings', color: C.olive, drill: 'savings', amount: money(cycleSavings), word: 'saved' },
   ]
 
-  const cycleLine = `${format(cycle.start, 'd MMM')} - ${format(cycle.end, 'd MMM')} · closes in ${cycle.daysLeft} ${cycle.daysLeft === 1 ? 'day' : 'days'}`
+  const daysToDueLabel = Math.max(0, differenceInDays(startOfDay(due), startOfDay(new Date())))
+  const cycleRange = `${format(cycle.start, 'd MMM')} - ${format(cycle.end, 'd MMM')}`
+  const cycleLine = isCurrent
+    ? `${cycleRange} · closes in ${cycle.daysLeft} ${cycle.daysLeft === 1 ? 'day' : 'days'}`
+    : cycle.isPast
+      ? `${cycleRange} · closed · pay in ${daysToDueLabel} ${daysToDueLabel === 1 ? 'day' : 'days'}`
+      : `${cycleRange} · upcoming`
   const dueLabel = format(due, 'd MMM')
 
   // ---- Bucket drill-down (preserved) ----------------------------------------
@@ -340,13 +354,40 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
       <div className="flex justify-between items-start">
         <div>
           <div className="font-serif" style={{ fontSize: 26, color: C.ink, lineHeight: 1.05 }}>Walters</div>
-          <div style={{ fontSize: 12.5, color: C.muted, marginTop: 5 }}>{cycleLine}</div>
+          <div className="flex items-center" style={{ gap: 4, marginTop: 5, marginLeft: -6 }}>
+            <button
+              onClick={() => setCycleOffset(o => o - 1)}
+              aria-label="Previous cycle"
+              style={{ color: C.muted, padding: 2, lineHeight: 0 }}
+            >
+              <ChevronLeft style={{ width: 17, height: 17 }} strokeWidth={2} />
+            </button>
+            <div style={{ fontSize: 12.5, color: C.muted }}>{cycleLine}</div>
+            <button
+              onClick={() => setCycleOffset(o => Math.min(0, o + 1))}
+              aria-label="Next cycle"
+              disabled={isCurrent}
+              style={{ color: isCurrent ? C.hairline : C.muted, padding: 2, lineHeight: 0 }}
+            >
+              <ChevronRight style={{ width: 17, height: 17 }} strokeWidth={2} />
+            </button>
+          </div>
         </div>
         <div className="flex-shrink-0 text-right" style={{ paddingTop: 2 }}>
           <div style={{ fontSize: 15, color: C.ink, fontWeight: 600 }}>{cyclePoints.toLocaleString()}</div>
           <div style={{ fontSize: 10.5, color: C.faint, letterSpacing: '0.3px' }}>Qantas pts</div>
         </div>
       </div>
+
+      {!isCurrent && (
+        <button
+          onClick={() => setCycleOffset(0)}
+          className="block text-left"
+          style={{ marginTop: 12, fontSize: 12.5, color: C.terra, fontWeight: 600 }}
+        >
+          ← Back to current cycle
+        </button>
+      )}
 
       {/* Hero one: left to spend */}
       <div style={{ marginTop: 34 }}>
