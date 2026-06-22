@@ -221,8 +221,9 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
 
   // Timeline: today -> cycle close -> payment due (~2 weeks of leeway after close).
   // For a cycle that has already closed, "close" sits at today (left) and the bar
-  // counts down to the due date, which is what's still ahead of you.
-  const due = useMemo(() => addDays(startOfDay(cycle.end), 14), [cycle])
+  // counts down to the due date, which is what's still ahead of you. The Amex
+  // payment falls 15 days after the statement closes (e.g. closes 21st, due 6th).
+  const due = useMemo(() => addDays(startOfDay(cycle.end), 15), [cycle])
   const daysToClose = cycle.daysLeft
   const daysToDue = Math.max(daysToClose, differenceInDays(due, startOfDay(new Date())))
   const closePct = Math.max(0, Math.min(100, daysToDue > 0 ? (daysToClose / daysToDue) * 100 : 0))
