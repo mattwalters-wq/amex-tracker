@@ -226,8 +226,16 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
   const daysToClose = cycle.daysLeft
   const daysToDue = Math.max(daysToClose, differenceInDays(due, startOfDay(new Date())))
   const closePct = Math.max(0, Math.min(100, daysToDue > 0 ? (daysToClose / daysToDue) * 100 : 0))
-  const annotationPct = (closePct + 100) / 2
+  // Once a cycle has closed the close marker sits on top of "Today"; drop it and
+  // show a clean Today -> Due track instead.
+  const showClose = closePct > 6
+  const annotationPct = showClose ? (closePct + 100) / 2 : 50
   const weeksToPay = Math.max(1, Math.round((daysToDue - daysToClose) / 7))
+  // Whole-bar pay window for a closed cycle reads better in days when it's short.
+  const daysToPay = Math.max(0, daysToDue)
+  const payLabel = !showClose && daysToPay < 14
+    ? `${daysToPay} ${daysToPay === 1 ? 'day' : 'days'} to pay`
+    : `${weeksToPay} ${weeksToPay === 1 ? 'week' : 'weeks'} to pay`
 
   // Editable CBA set-aside (persisted real user data).
   const [setAside, setSetAside] = useState(settings.cba_set_aside ?? 4600)
@@ -416,7 +424,7 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
             className="font-serif italic"
             style={{ position: 'absolute', left: annotationPct + '%', bottom: 0, transform: 'translateX(-50%)', fontSize: 15, color: C.sage, whiteSpace: 'nowrap', lineHeight: 1 }}
           >
-            {weeksToPay === 1 ? '1 week to pay' : `${weeksToPay} weeks to pay`}
+            {payLabel}
           </div>
         </div>
         {/* track */}
@@ -424,7 +432,9 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
           <div style={{ position: 'absolute', top: 4, left: 5, right: 5, height: 2, background: C.hairline, borderRadius: 2 }} />
           <div style={{ position: 'absolute', top: 4, left: closePct + '%', right: 5, height: 2, background: C.sage, borderRadius: 2 }} />
           <div style={{ position: 'absolute', top: 0, left: 5, transform: 'translateX(-50%)', width: 10, height: 10, borderRadius: '50%', background: C.ink }} />
-          <div style={{ position: 'absolute', top: 0, left: closePct + '%', transform: 'translateX(-50%)', width: 10, height: 10, borderRadius: '50%', background: C.screen, border: `2px solid ${C.muted}` }} />
+          {showClose && (
+            <div style={{ position: 'absolute', top: 0, left: closePct + '%', transform: 'translateX(-50%)', width: 10, height: 10, borderRadius: '50%', background: C.screen, border: `2px solid ${C.muted}` }} />
+          )}
           <div style={{ position: 'absolute', top: 0, right: 5, transform: 'translateX(50%)', width: 10, height: 10, borderRadius: '50%', background: C.sage }} />
         </div>
         {/* labels */}
@@ -433,10 +443,12 @@ export default function Dashboard({ transactions, settings, onDelete, onUpdate, 
             <div style={{ fontSize: 11.5, color: C.ink, fontWeight: 600 }}>Today</div>
             <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>{format(new Date(), 'd MMM')}</div>
           </div>
-          <div style={{ position: 'absolute', left: closePct + '%', top: 0, transform: 'translateX(-50%)', textAlign: 'center' }}>
-            <div style={{ fontSize: 11.5, color: C.ink, fontWeight: 600 }}>Closes</div>
-            <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>{format(cycle.end, 'd MMM')}</div>
-          </div>
+          {showClose && (
+            <div style={{ position: 'absolute', left: closePct + '%', top: 0, transform: 'translateX(-50%)', textAlign: 'center' }}>
+              <div style={{ fontSize: 11.5, color: C.ink, fontWeight: 600 }}>Closes</div>
+              <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>{format(cycle.end, 'd MMM')}</div>
+            </div>
+          )}
           <div style={{ position: 'absolute', right: 0, top: 0, textAlign: 'right' }}>
             <div style={{ fontSize: 11.5, color: C.ink, fontWeight: 600 }}>Due</div>
             <div style={{ fontSize: 10.5, color: C.faint, marginTop: 2 }}>{dueLabel}</div>
