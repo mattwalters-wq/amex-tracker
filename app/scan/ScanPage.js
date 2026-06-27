@@ -11,6 +11,57 @@ function cycleBucket(current) {
   return BUCKET_ORDER[(idx + 1) % BUCKET_ORDER.length]
 }
 
+// Read a file straight to base64 (used for PDFs and as an image fallback).
+function readBase64(file) {
+  return new Promise((res, rej) => {
+    const reader = new FileReader()
+    reader.onload = () => res(reader.result.split(',')[1])
+    reader.onerror = () => rej(new Error('File read failed'))
+    reader.readAsDataURL(file)
+  })
+}
+
+// Downscale + JPEG-compress an image so the API request stays small. Phone
+// screenshots are multi-MB PNGs; a big request is what dies as "Load failed"
+// on a weak connection. Anthropic downscales anything over ~1568px anyway, so
+// there's no quality loss for statement text.
+function downscaleImage(file, maxDim = 1568, quality = 0.8) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxDim / Math.max(img.width, img.height))
+      const width = Math.max(1, Math.round(img.width * scale))
+      const height = Math.max(1, Math.round(img.height * scale))
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d')
+      ctx.fillStyle = '#fff' // flatten any transparency for JPEG
+      ctx.fillRect(0, 0, width, height)
+      ctx.drawImage(img, 0, 0, width, height)
+      resolve(canvas.toDataURL('image/jpeg', quality).split(',')[1])
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('image decode failed')) }
+    img.src = url
+  })
+}
+
+// Turn a picked file into an Anthropic content block, compressing images first.
+async function fileToContentBlock(file) {
+  if (file.type === 'application/pdf') {
+    return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: await readBase64(file) } }
+  }
+  try {
+    const data = await downscaleImage(file)
+    return { type: 'image', source: { type: 'base64', media_type: 'image/jpeg', data } }
+  } catch {
+    // Fall back to the original bytes if the browser can't decode for canvas
+    return { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: await readBase64(file) } }
+  }
+}
+
 export default function ScanPage({ transactions, onImport }) {
   const [card, setCard] = useState(null)
   const [stage, setStage] = useState('pick-card')
@@ -35,20 +86,7 @@ export default function ScanPage({ transactions, onImport }) {
     }
 
     try {
-      const imageBlocks = await Promise.all(
-        Array.from(files).map(async (file) => {
-          const base64 = await new Promise((res, rej) => {
-            const reader = new FileReader()
-            reader.onload = () => res(reader.result.split(',')[1])
-            reader.onerror = () => rej(new Error('File read failed'))
-            reader.readAsDataURL(file)
-          })
-          if (file.type === 'application/pdf') {
-            return { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: base64 } }
-          }
-          return { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } }
-        })
-      )
+      const imageBlocks = await Promise.all(Array.from(files).map(fileToContentBlock))
 
       const systemPrompt = `You are a transaction extractor. Extract all real purchase transactions from these bank statement screenshots or PDFs.
 
@@ -136,7 +174,11 @@ Return ONLY valid JSON array.`
       setSelected(withDupFlag.map(tx => !tx.isDuplicate))
       setStage('reviewing')
     } catch (err) {
-      setError(err.message)
+      const raw = err?.message || ''
+      const networkish = /load failed|failed to fetch|networkerror|network request failed/i.test(raw)
+      setError(networkish
+        ? 'Upload failed — couldn’t reach the server. Check your connection and try again.'
+        : raw || 'Something went wrong. Try again.')
       setStage('pick-card')
     }
   }
