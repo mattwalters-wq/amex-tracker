@@ -48,6 +48,38 @@ function downscaleImage(file, maxDim = 1568, quality = 0.8) {
   })
 }
 
+// Pull a transaction array out of the model's reply, tolerating code fences,
+// surrounding prose, an object wrapper, or a response truncated mid-array.
+function extractTransactions(text) {
+  const clean = (text || '').replace(/```json\n?|```/g, '').trim()
+  // 1) Clean array or object as-is
+  try {
+    const v = JSON.parse(clean)
+    if (Array.isArray(v)) return v
+    if (v && typeof v === 'object') {
+      const arr = Object.values(v).find(Array.isArray)
+      if (arr) return arr
+    }
+  } catch { /* fall through */ }
+
+  const start = clean.indexOf('[')
+  if (start === -1) return null
+  const body = clean.slice(start)
+
+  // 2) Outermost array, if the closing bracket is present
+  const end = body.lastIndexOf(']')
+  if (end !== -1) {
+    try { return JSON.parse(body.slice(0, end + 1)) } catch { /* fall through */ }
+  }
+
+  // 3) Truncated mid-array: keep everything up to the last complete object
+  const lastObj = body.lastIndexOf('}')
+  if (lastObj !== -1) {
+    try { return JSON.parse(body.slice(0, lastObj + 1) + ']') } catch { /* fall through */ }
+  }
+  return null
+}
+
 // Turn a picked file into an Anthropic content block, compressing images first.
 async function fileToContentBlock(file) {
   if (file.type === 'application/pdf') {
@@ -127,7 +159,7 @@ Return ONLY valid JSON array.`
         },
         body: JSON.stringify({
           model: 'claude-sonnet-4-6',
-          max_tokens: 4000,
+          max_tokens: 16000,
           system: systemPrompt,
           messages: [{ role: 'user', content: msgContent }],
         }),
@@ -140,14 +172,11 @@ Return ONLY valid JSON array.`
 
       const data = await res.json()
       const text = data.content?.find(b => b.type === 'text')?.text || ''
-      const clean = text.replace(/```json\n?|```/g, '').trim()
 
-      let parsed
-      try { parsed = JSON.parse(clean) } catch {
-        throw new Error('Could not parse AI response. Try a clearer screenshot.')
+      const parsed = extractTransactions(text)
+      if (!Array.isArray(parsed)) {
+        throw new Error('Could not read transactions from that screenshot. Try a clearer or less zoomed-out image.')
       }
-
-      if (!Array.isArray(parsed)) throw new Error('Unexpected response format')
 
       const sanitized = parsed
         .filter(tx => !SKIP_MERCHANTS.some(s => (tx.note || '').toLowerCase().includes(s)))
